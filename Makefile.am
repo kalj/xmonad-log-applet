@@ -88,6 +88,11 @@ org.mate.panel.applet.XmonadLogAppletFactory.service: $(service_in_files)
 	$(SED) -e "s|\@PLUGIN_DIR\@|$(PLUGIN_DIR)|" $< > $@
 endif
 
+if PANEL_MATE
+gsettings_SCHEMAS = org.mate.panel.applet.xmonad-log.gschema.xml
+endif
+@GSETTINGS_RULES@
+
 DISTCLEANFILES = \
 	$(applet_DATA) \
 	$(service_DATA)
@@ -102,6 +107,7 @@ EXTRA_DIST = \
 	org.gnome.panel.applet.XmonadLogAppletFactory.service.in \
 	org.mate.panel.XmonadLogApplet.mate-panel-applet.in \
 	org.mate.panel.applet.XmonadLogAppletFactory.service.in \
+	org.mate.panel.applet.xmonad-log.gschema.xml \
 	xmonad-log-applet.desktop.in
 
 gtk_update_icon_cache = gtk-update-icon-cache -f -t

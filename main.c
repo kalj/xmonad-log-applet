@@ -24,6 +24,9 @@
 #endif
 #ifdef PANEL_MATE
 #include <mate-panel-applet.h>
+#include <mate-panel-applet-gsettings.h>
+
+#define XMONAD_LOG_APPLET_SCHEMA "org.mate.panel.applet.xmonad-log"
 #endif
 #ifdef PANEL_XFCE4
 #include <libxfce4panel/xfce-panel-plugin.h>
@@ -226,6 +229,50 @@ static void set_up_dbus_transfer(GtkWidget *buf)
         proxy, "Update", (GCallback)signal_handler, buf, NULL);
 }
 
+#ifdef PANEL_MATE
+// Appearance settings
+static const char menu_xml[] =
+    "<menuitem name=\"Expand\" action=\"Expand\" />";
+
+static const GtkToggleActionEntry menu_toggle_actions[] = {
+    { "Expand", NULL, "_Expand to Fill Panel", NULL,
+      "Let the applet take up all free space along the panel", NULL, TRUE },
+};
+
+// Apply the "expand" setting as MATE_PANEL_APPLET_EXPAND_MAJOR
+static void apply_expand_setting(GSettings *settings, const gchar *key, gpointer applet)
+{
+    MatePanelAppletFlags flags = mate_panel_applet_get_flags(MATE_PANEL_APPLET(applet));
+
+    if (g_settings_get_boolean(settings, "expand"))
+        flags |= MATE_PANEL_APPLET_EXPAND_MAJOR;
+    else
+        flags &= ~MATE_PANEL_APPLET_EXPAND_MAJOR;
+
+    mate_panel_applet_set_flags(MATE_PANEL_APPLET(applet), flags);
+}
+
+static void set_up_settings_and_menu(MatePanelApplet *applet)
+{
+    // Per-applet-instance settings; owned by the applet from here on
+    GSettings *settings = mate_panel_applet_settings_new(applet, XMONAD_LOG_APPLET_SCHEMA);
+    g_object_set_data_full(G_OBJECT(applet), "settings", settings, g_object_unref);
+
+    GtkActionGroup *actions = gtk_action_group_new("XmonadLogAppletActions");
+    gtk_action_group_add_toggle_actions(
+        actions, menu_toggle_actions, G_N_ELEMENTS(menu_toggle_actions), applet);
+
+    // The check item and the setting mirror each other, both ways
+    g_settings_bind(settings, "expand",
+                    gtk_action_group_get_action(actions, "Expand"), "active",
+                    G_SETTINGS_BIND_DEFAULT);
+    g_signal_connect(settings, "changed::expand", G_CALLBACK(apply_expand_setting), applet);
+    apply_expand_setting(settings, "expand", applet);
+
+    mate_panel_applet_setup_menu(applet, menu_xml, actions);
+    g_object_unref(actions);
+}
+#endif
 
 #ifdef PANEL_GNOME
 static gboolean xmonad_log_applet_fill(PanelApplet *applet)
@@ -249,11 +296,12 @@ static void xmonad_log_applet_fill(GtkContainer *container)
     #endif
 #endif
 #ifdef PANEL_MATE
+    // EXPAND_MAJOR is controlled by the "expand" setting
     mate_panel_applet_set_flags(
         applet,
-        MATE_PANEL_APPLET_EXPAND_MAJOR |
         MATE_PANEL_APPLET_EXPAND_MINOR |
         MATE_PANEL_APPLET_HAS_HANDLE);
+    set_up_settings_and_menu(applet);
 
     mate_panel_applet_set_background_widget(applet, GTK_WIDGET(applet));
 #endif

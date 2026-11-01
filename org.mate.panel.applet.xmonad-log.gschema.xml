@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <!-- Relocatable: mate-panel gives each applet instance its own path -->
+  <schema id="org.mate.panel.applet.xmonad-log">
+    <key name="expand" type="b">
+      <default>true</default>
+      <summary>Expand to fill panel</summary>
+      <description>Whether the applet takes up all free space along the panel (MATE_PANEL_APPLET_EXPAND_MAJOR).</description>
+    </key>
+  </schema>
+</schemalist>

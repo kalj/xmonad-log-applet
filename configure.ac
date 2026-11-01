@@ -52,7 +52,7 @@ AS_IF(
         [AC_DEFINE(PANEL_GNOMEFLASHBACK, 1, [panel type])]
         ,
     [test "x$panel" = xmate],
-        [PKG_CHECK_MODULES(LIBPANEL, libmatepanelapplet-4.0 >= 1.4.0)]
+        [PKG_CHECK_MODULES(LIBPANEL, libmatepanelapplet-4.0 >= 1.6.0)]
         LIBPANEL_APPLET_DIR=`$PKG_CONFIG --variable=prefix libmatepanelapplet-4.0`/share/mate-panel/applets
         PLUGIN_DIR=`$PKG_CONFIG --variable=prefix libmatepanelapplet-4.0`/libexec
         [AC_DEFINE(PANEL_MATE, 1, [panel type])]
@@ -77,6 +77,9 @@ AM_CONDITIONAL([PANEL_MATE], [test "x$panel" = xmate])
 AM_CONDITIONAL([PANEL_XFCE4], [test "x$panel" = xxfce4])
 AM_CONDITIONAL([PANEL_GNOME_IN_PROC], [test "$PANEL_GNOME_IN_PROC" -eq 1])
 AS_IF([test "$PANEL_GNOME_IN_PROC" -eq 1], [AC_DEFINE([PANEL_GNOME_IN_PROC], [1], [Define if using libpanel-applet >= 3.22.0 and we need in process applet.])])
+
+# GSettings schema (only installed for the MATE panel, see Makefile.am)
+GLIB_GSETTINGS
 
 AC_CONFIG_FILES([Makefile])
 
