@@ -199,18 +199,34 @@ static gboolean workspace_color(GtkWidget *container, int state, GdkColor *color
     return found;
 }
 
-// A boolean appearance setting: the user's setting where there are
-// settings, otherwise the schema default, otherwise FALSE
-static gboolean appearance_boolean(GtkWidget *container, const char *key)
+// An appearance setting: the user's setting where there are settings,
+// otherwise the schema default. NULL if neither is available.
+static GVariant *appearance_value(GtkWidget *container, const char *key)
 {
     GSettings *settings = g_object_get_data(G_OBJECT(container), "settings");
     if (settings != NULL)
-        return g_settings_get_boolean(settings, key);
+        return g_settings_get_value(settings, key);
+    return schema_default_value(key);
+}
 
-    GVariant *value = schema_default_value(key);
+// A boolean appearance setting, FALSE if it is not available
+static gboolean appearance_boolean(GtkWidget *container, const char *key)
+{
+    GVariant *value = appearance_value(container, key);
     if (value == NULL)
         return FALSE;
     gboolean result = g_variant_get_boolean(value);
+    g_variant_unref(value);
+    return result;
+}
+
+// An integer appearance setting, 0 if it is not available
+static gint appearance_int(GtkWidget *container, const char *key)
+{
+    GVariant *value = appearance_value(container, key);
+    if (value == NULL)
+        return 0;
+    gint result = g_variant_get_int32(value);
     g_variant_unref(value);
     return result;
 }
@@ -249,6 +265,7 @@ static void signal_handler(DBusGProxy *obj, const char *msg, GtkWidget *containe
 
     gboolean bold_numbers = appearance_boolean(container, "bold-numbers");
     gboolean bold_title = appearance_boolean(container, "bold-title");
+    gint title_max_width = appearance_int(container, "title-max-width");
 
     // Parse msg and repopulate container
     char *m = (char *)msg;
@@ -307,9 +324,20 @@ static void signal_handler(DBusGProxy *obj, const char *msg, GtkWidget *containe
         }
     }
 
-    // Window title
+    // Window title. A title longer than the limit is shortened with "...",
+    // keeping the limit's width: an ellipsized label may otherwise shrink to
+    // just the "...". A limited title doesn't expand into free space either.
     GtkWidget *label = text_label(m, bold_title);
-    gtk_container_add(GTK_CONTAINER(container), label);
+    if (title_max_width > 0) {
+        if (g_utf8_strlen(m, -1) > title_max_width) {
+            gtk_label_set_ellipsize(GTK_LABEL(label), PANGO_ELLIPSIZE_END);
+            gtk_label_set_width_chars(GTK_LABEL(label), title_max_width);
+            gtk_label_set_max_width_chars(GTK_LABEL(label), title_max_width);
+        }
+        gtk_box_pack_start(GTK_BOX(container), label, FALSE, FALSE, 0);
+    } else {
+        gtk_container_add(GTK_CONTAINER(container), label);
+    }
 
     gtk_widget_show_all(container);
 }
@@ -467,6 +495,38 @@ static GtkWidget *check_row(GSettings *settings, const char *label_text,
     return check;
 }
 
+// "<label> [spin button] <unit>" bound to an integer key, with the range
+// taken from the schema
+static GtkWidget *spin_row(GSettings *settings, const char *label_text, const char *unit,
+                           const char *tooltip, const char *key)
+{
+    gint min = 0, max = G_MAXINT;
+    GSettingsSchemaKey *schema_key = g_settings_schema_get_key(appearance_schema(), key);
+    GVariant *range = g_settings_schema_key_get_range(schema_key);
+    const gchar *range_type;
+    GVariant *limits;
+    g_variant_get(range, "(&sv)", &range_type, &limits);
+    if (strcmp(range_type, "range") == 0)
+        g_variant_get(limits, "(ii)", &min, &max);
+    g_variant_unref(limits);
+    g_variant_unref(range);
+    g_settings_schema_key_unref(schema_key);
+
+    GtkWidget *row = gtk_hbox_new(FALSE, 6);
+    gtk_widget_set_tooltip_text(row, tooltip);
+
+    GtkWidget *label = gtk_label_new_with_mnemonic(label_text);
+    gtk_box_pack_start(GTK_BOX(row), label, FALSE, FALSE, 0);
+
+    GtkWidget *spin = gtk_spin_button_new_with_range(min, max, 1);
+    gtk_label_set_mnemonic_widget(GTK_LABEL(label), spin);
+    g_settings_bind(settings, key, spin, "value", G_SETTINGS_BIND_DEFAULT);
+    gtk_box_pack_start(GTK_BOX(row), spin, FALSE, FALSE, 0);
+
+    gtk_box_pack_start(GTK_BOX(row), gtk_label_new(unit), FALSE, FALSE, 0);
+    return row;
+}
+
 static void preferences_destroyed(GObject *applet, GtkWidget *dialog)
 {
     g_object_set_data(applet, "prefs-dialog", NULL);
@@ -537,6 +597,11 @@ static void show_preferences(GtkAction *action, gpointer applet)
     gtk_box_pack_start(GTK_BOX(text_rows),
                        check_row(settings, "Bold window _title",
                                  "Show the title of the focused window in bold", "bold-title"),
+                       FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(text_rows),
+                       spin_row(settings, "Maximum title _width:", "characters",
+                                "Shorten longer window titles with \u2026. 0 means no limit.",
+                                "title-max-width"),
                        FALSE, FALSE, 0);
 
     // Forget the dialog when it closes, and close it if the applet is removed

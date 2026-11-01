@@ -37,5 +37,11 @@
       <summary>Bold window title</summary>
       <description>Whether the title of the focused window is shown in bold.</description>
     </key>
+    <key name="title-max-width" type="i">
+      <range min="0" max="1000"/>
+      <default>0</default>
+      <summary>Maximum window title width</summary>
+      <description>Maximum width of the window title, in characters. Longer titles are shortened with an ellipsis. 0 means no limit.</description>
+    </key>
   </schema>
 </schemalist>
