@@ -7,5 +7,25 @@
       <summary>Expand to fill panel</summary>
       <description>Whether the applet takes up all free space along the panel (MATE_PANEL_APPLET_EXPAND_MAJOR).</description>
     </key>
+    <key name="color-current" type="s">
+      <default>'green'</default>
+      <summary>Colour of current workspaces</summary>
+      <description>Colour of the number for the workspace shown on the focused screen. A colour name or #rrggbb.</description>
+    </key>
+    <key name="color-visible" type="s">
+      <default>'yellow'</default>
+      <summary>Colour of visible workspaces</summary>
+      <description>Colour of the number for workspaces shown on other screens. A colour name or #rrggbb.</description>
+    </key>
+    <key name="color-hidden" type="s">
+      <default>'white'</default>
+      <summary>Colour of hidden workspaces</summary>
+      <description>Colour of the number for workspaces that are not shown on any screen. A colour name or #rrggbb.</description>
+    </key>
+    <key name="color-urgent" type="s">
+      <default>'red'</default>
+      <summary>Colour of urgent workspaces</summary>
+      <description>Colour of the number for workspaces with a window asking for attention. A colour name or #rrggbb.</description>
+    </key>
   </schema>
 </schemalist>

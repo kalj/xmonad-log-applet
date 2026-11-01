@@ -113,9 +113,52 @@ static void icon_click(GtkWidget *widget, GdkEventButton *event, gpointer xid) {
     xcb_flush(c);
 }
 
+// Workspace states as marked by xmonad.hs, the GSettings key holding each
+// state's colour (MATE only), and the colour used when there is no setting
+static const struct {
+    char marker;
+    const char *key;
+    const char *label;
+    const char *fallback;
+} workspace_states[] = {
+    { '*', "color-current", "_Current:", "green"  },
+    { '+', "color-visible", "_Visible:", "yellow" },
+    { '-', "color-hidden",  "_Hidden:",  "white"  },
+    { '!', "color-urgent",  "_Urgent:",  "red"    },
+};
+
+// Look up the colour for a workspace state marker. Returns FALSE if the
+// marker is unknown.
+static gboolean workspace_color(GtkWidget *container, char marker, GdkColor *color)
+{
+    GSettings *settings = g_object_get_data(G_OBJECT(container), "settings");
+
+    for (guint i = 0; i < G_N_ELEMENTS(workspace_states); i++) {
+        if (workspace_states[i].marker != marker)
+            continue;
+
+        if (settings != NULL) {
+            gchar *value = g_settings_get_string(settings, workspace_states[i].key);
+            gboolean parsed = gdk_color_parse(value, color);
+            g_free(value);
+            if (parsed)
+                return TRUE;
+        }
+        return gdk_color_parse(workspace_states[i].fallback, color);
+    }
+    return FALSE;
+}
+
 // DBUS
 static void signal_handler(DBusGProxy *obj, const char *msg, GtkWidget *container)
 {
+    // Remember the message, so it can be redrawn when the colours change
+    if (msg != g_object_get_data(G_OBJECT(container), "last-msg")) {
+        char *copy = g_strdup(msg);
+        g_object_set_data_full(G_OBJECT(container), "last-msg", copy, g_free);
+        msg = copy;
+    }
+
     // Clear container
     GList *children, *iter;
     children = gtk_container_get_children(GTK_CONTAINER(container));
@@ -133,25 +176,8 @@ static void signal_handler(DBusGProxy *obj, const char *msg, GtkWidget *containe
         }
 
         GdkColor color;
-        switch (*m) {
-            case '*':
-                // Current
-                gdk_color_parse("green", &color);
-                break;
-            case '+':
-                // Visible
-                gdk_color_parse("yellow", &color);
-                break;
-            case '-':
-                // Hidden
-                gdk_color_parse("white", &color);
-                break;
-            case '!':
-                // Urgent
-                gdk_color_parse("red", &color);
-                break;
-            default:
-                return;
+        if (!workspace_color(container, *m, &color)) {
+            return;
         }
         m++;
 
@@ -254,6 +280,54 @@ static void apply_expand_setting(GSettings *settings, const gchar *key, gpointer
     mate_panel_applet_set_flags(MATE_PANEL_APPLET(applet), flags);
 }
 
+// Redraw the workspaces with the last message, e.g. after a colour change
+static void redraw_workspaces(GSettings *settings, const gchar *key, gpointer container)
+{
+    const char *msg = g_object_get_data(G_OBJECT(container), "last-msg");
+    if (msg != NULL)
+        signal_handler(NULL, msg, GTK_WIDGET(container));
+}
+
+// Colours are stored as strings ("red", "#3465a4", ...) and shown as GdkColor
+static gboolean color_from_setting(GValue *value, GVariant *variant, gpointer user_data)
+{
+    GdkColor color;
+    if (!gdk_color_parse(g_variant_get_string(variant, NULL), &color))
+        return FALSE;   // GSettings then falls back to the schema default
+    g_value_set_boxed(value, &color);
+    return TRUE;
+}
+
+static GVariant *color_to_setting(const GValue *value, const GVariantType *type, gpointer user_data)
+{
+    const GdkColor *color = g_value_get_boxed(value);
+    gchar *str = g_strdup_printf("#%02x%02x%02x",
+                                 color->red >> 8, color->green >> 8, color->blue >> 8);
+    GVariant *variant = g_variant_new_string(str);
+    g_free(str);
+    return variant;
+}
+
+// A "<label> [colour button]" row in the preferences dialog, bound to a key
+static GtkWidget *color_row(GSettings *settings, GtkSizeGroup *labels,
+                            const char *label_text, const char *key)
+{
+    GtkWidget *row = gtk_hbox_new(FALSE, 12);
+
+    GtkWidget *label = gtk_label_new_with_mnemonic(label_text);
+    gtk_misc_set_alignment(GTK_MISC(label), 0, 0.5);
+    gtk_size_group_add_widget(labels, label);
+    gtk_box_pack_start(GTK_BOX(row), label, FALSE, FALSE, 0);
+
+    GtkWidget *button = gtk_color_button_new();
+    gtk_label_set_mnemonic_widget(GTK_LABEL(label), button);
+    g_settings_bind_with_mapping(settings, key, button, "color", G_SETTINGS_BIND_DEFAULT,
+                                 color_from_setting, color_to_setting, NULL, NULL);
+    gtk_box_pack_start(GTK_BOX(row), button, FALSE, FALSE, 0);
+
+    return row;
+}
+
 static void preferences_destroyed(GObject *applet, GtkWidget *dialog)
 {
     g_object_set_data(applet, "prefs-dialog", NULL);
@@ -288,6 +362,25 @@ static void show_preferences(GtkAction *action, gpointer applet)
     g_settings_bind(settings, "expand", expand, "active", G_SETTINGS_BIND_DEFAULT);
     gtk_box_pack_start(GTK_BOX(vbox), expand, FALSE, FALSE, 0);
 
+    // Workspace colours: a bold heading, then one indented row per state
+    GtkWidget *heading = gtk_label_new(NULL);
+    gtk_label_set_markup(GTK_LABEL(heading), "<b>Workspace Colours</b>");
+    gtk_misc_set_alignment(GTK_MISC(heading), 0, 0.5);
+    gtk_box_pack_start(GTK_BOX(vbox), heading, FALSE, FALSE, 6);
+
+    GtkWidget *indent = gtk_hbox_new(FALSE, 0);
+    GtkWidget *rows = gtk_vbox_new(FALSE, 6);
+    gtk_box_pack_start(GTK_BOX(indent), rows, FALSE, FALSE, 12);
+    gtk_box_pack_start(GTK_BOX(vbox), indent, FALSE, FALSE, 0);
+
+    GtkSizeGroup *labels = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
+    for (guint i = 0; i < G_N_ELEMENTS(workspace_states); i++)
+        gtk_box_pack_start(GTK_BOX(rows),
+                           color_row(settings, labels, workspace_states[i].label,
+                                     workspace_states[i].key),
+                           FALSE, FALSE, 0);
+    g_object_unref(labels);
+
     // Forget the dialog when it closes, and close it if the applet is removed
     g_object_set_data(G_OBJECT(applet), "prefs-dialog", dialog);
     g_signal_connect_object(dialog, "destroy", G_CALLBACK(preferences_destroyed),
@@ -298,11 +391,19 @@ static void show_preferences(GtkAction *action, gpointer applet)
     gtk_widget_show_all(dialog);
 }
 
-static void set_up_settings_and_menu(MatePanelApplet *applet)
+static void set_up_settings_and_menu(MatePanelApplet *applet, GtkWidget *container)
 {
     // Per-applet-instance settings; owned by the applet from here on
     GSettings *settings = mate_panel_applet_settings_new(applet, XMONAD_LOG_APPLET_SCHEMA);
     g_object_set_data_full(G_OBJECT(applet), "settings", settings, g_object_unref);
+
+    // The workspace colours are read in signal_handler, via the container
+    g_object_set_data(G_OBJECT(container), "settings", settings);
+    for (guint i = 0; i < G_N_ELEMENTS(workspace_states); i++) {
+        gchar *signal = g_strconcat("changed::", workspace_states[i].key, NULL);
+        g_signal_connect_object(settings, signal, G_CALLBACK(redraw_workspaces), container, 0);
+        g_free(signal);
+    }
 
     g_signal_connect(settings, "changed::expand", G_CALLBACK(apply_expand_setting), applet);
     apply_expand_setting(settings, "expand", applet);
@@ -341,12 +442,14 @@ static void xmonad_log_applet_fill(GtkContainer *container)
         applet,
         MATE_PANEL_APPLET_EXPAND_MINOR |
         MATE_PANEL_APPLET_HAS_HANDLE);
-    set_up_settings_and_menu(applet);
 
     mate_panel_applet_set_background_widget(applet, GTK_WIDGET(applet));
 #endif
 
     GtkWidget *box = gtk_hbox_new(FALSE, 8);
+#ifdef PANEL_MATE
+    set_up_settings_and_menu(applet, box);
+#endif
     xcb_init();
     set_up_dbus_transfer(box);
 
