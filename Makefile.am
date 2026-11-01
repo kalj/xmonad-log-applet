@@ -88,9 +88,9 @@ org.mate.panel.applet.XmonadLogAppletFactory.service: $(service_in_files)
 	$(SED) -e "s|\@PLUGIN_DIR\@|$(PLUGIN_DIR)|" $< > $@
 endif
 
-if PANEL_MATE
+# Installed for all panels: the defaults are read from it everywhere, even
+# though only MATE stores settings with it so far
 gsettings_SCHEMAS = org.mate.panel.applet.xmonad-log.gschema.xml
-endif
 @GSETTINGS_RULES@
 
 DISTCLEANFILES = \

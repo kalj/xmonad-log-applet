@@ -16,7 +16,7 @@ AC_HEADER_STDC
 
 PKG_PROG_PKG_CONFIG
 
-PKG_CHECK_MODULES(GLIB, glib-2.0 >= 2.20.0)
+PKG_CHECK_MODULES(GLIB, glib-2.0 >= 2.40.0)
 PKG_CHECK_MODULES(XCB, xcb xcb-ewmh)
 
 PKG_CHECK_MODULES(DBUS_GLIB, dbus-glib-1 >= 0.80)
@@ -78,7 +78,7 @@ AM_CONDITIONAL([PANEL_XFCE4], [test "x$panel" = xxfce4])
 AM_CONDITIONAL([PANEL_GNOME_IN_PROC], [test "$PANEL_GNOME_IN_PROC" -eq 1])
 AS_IF([test "$PANEL_GNOME_IN_PROC" -eq 1], [AC_DEFINE([PANEL_GNOME_IN_PROC], [1], [Define if using libpanel-applet >= 3.22.0 and we need in process applet.])])
 
-# GSettings schema (only installed for the MATE panel, see Makefile.am)
+# GSettings schema with the appearance settings and their defaults
 GLIB_GSETTINGS
 
 AC_CONFIG_FILES([Makefile])

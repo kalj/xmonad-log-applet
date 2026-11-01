@@ -19,14 +19,16 @@
 #include <dbus/dbus.h>
 #include <xcb/xcb_ewmh.h>
 
+// GSettings schema with the appearance settings and their defaults. It is
+// installed for all panels, but only MATE stores settings with it so far.
+#define XMONAD_LOG_APPLET_SCHEMA "org.mate.panel.applet.xmonad-log"
+
 #ifdef PANEL_GNOME
 #include <panel-applet.h>
 #endif
 #ifdef PANEL_MATE
 #include <mate-panel-applet.h>
 #include <mate-panel-applet-gsettings.h>
-
-#define XMONAD_LOG_APPLET_SCHEMA "org.mate.panel.applet.xmonad-log"
 #endif
 #ifdef PANEL_XFCE4
 #include <libxfce4panel/xfce-panel-plugin.h>
@@ -114,40 +116,75 @@ static void icon_click(GtkWidget *widget, GdkEventButton *event, gpointer xid) {
 }
 
 // Workspace states as marked by xmonad.hs, the GSettings key holding each
-// state's colour (MATE only), and the colour used when there is no setting.
-// The fallbacks must match the defaults in the GSettings schema.
+// state's colour (whose default is in the schema), and its dialog label
 static const struct {
     char marker;
     const char *key;
     const char *label;
-    const char *fallback;
 } workspace_states[] = {
-    { '*', "color-current", "_Current:", "green"  },
-    { '+', "color-visible", "_Visible:", "yellow" },
-    { '-', "color-hidden",  "_Hidden:",  "white"  },
-    { '!', "color-urgent",  "_Urgent:",  "red"    },
+    { '*', "color-current", "_Current:" },
+    { '+', "color-visible", "_Visible:" },
+    { '-', "color-hidden",  "_Hidden:"  },
+    { '!', "color-urgent",  "_Urgent:"  },
 };
 
-// Look up the colour for a workspace state marker. Returns FALSE if the
-// marker is unknown.
-static gboolean workspace_color(GtkWidget *container, char marker, GdkColor *color)
+// Index into workspace_states for a state marker, or -1 if it is unknown
+static int workspace_state(char marker)
 {
-    GSettings *settings = g_object_get_data(G_OBJECT(container), "settings");
+    for (guint i = 0; i < G_N_ELEMENTS(workspace_states); i++)
+        if (workspace_states[i].marker == marker)
+            return i;
+    return -1;
+}
 
-    for (guint i = 0; i < G_N_ELEMENTS(workspace_states); i++) {
-        if (workspace_states[i].marker != marker)
-            continue;
+// The appearance schema, looked up once. NULL if it is not installed.
+static GSettingsSchema *appearance_schema(void)
+{
+    static GSettingsSchema *schema = NULL;
+    static gboolean looked_up = FALSE;
 
-        if (settings != NULL) {
-            gchar *value = g_settings_get_string(settings, workspace_states[i].key);
-            gboolean parsed = gdk_color_parse(value, color);
-            g_free(value);
-            if (parsed)
-                return TRUE;
-        }
-        return gdk_color_parse(workspace_states[i].fallback, color);
+    if (!looked_up) {
+        GSettingsSchemaSource *source = g_settings_schema_source_get_default();
+        if (source != NULL)
+            schema = g_settings_schema_source_lookup(source, XMONAD_LOG_APPLET_SCHEMA, TRUE);
+        if (schema == NULL)
+            g_warning("GSettings schema %s not found, using theme colours",
+                      XMONAD_LOG_APPLET_SCHEMA);
+        looked_up = TRUE;
     }
-    return FALSE;
+    return schema;
+}
+
+// Parse a colour stored as a string ("red", "#3465a4", ...)
+static gboolean parse_color_variant(GVariant *variant, GdkColor *color)
+{
+    return gdk_color_parse(g_variant_get_string(variant, NULL), color);
+}
+
+// The colour for a workspace state: the user's setting if there is a valid
+// one, otherwise the schema default. Returns FALSE if neither is available,
+// in which case the theme's text colour should be used.
+static gboolean workspace_color(GtkWidget *container, int state, GdkColor *color)
+{
+    const char *key = workspace_states[state].key;
+    gboolean found = FALSE;
+
+    GSettings *settings = g_object_get_data(G_OBJECT(container), "settings");
+    if (settings != NULL) {
+        GVariant *value = g_settings_get_value(settings, key);
+        found = parse_color_variant(value, color);
+        g_variant_unref(value);
+    }
+
+    GSettingsSchema *schema = appearance_schema();
+    if (!found && schema != NULL) {
+        GSettingsSchemaKey *schema_key = g_settings_schema_get_key(schema, key);
+        GVariant *value = g_settings_schema_key_get_default_value(schema_key);
+        found = parse_color_variant(value, color);
+        g_variant_unref(value);
+        g_settings_schema_key_unref(schema_key);
+    }
+    return found;
 }
 
 // DBUS
@@ -176,8 +213,8 @@ static void signal_handler(DBusGProxy *obj, const char *msg, GtkWidget *containe
             break;
         }
 
-        GdkColor color;
-        if (!workspace_color(container, *m, &color)) {
+        int state = workspace_state(*m);
+        if (state < 0) {
             return;
         }
         m++;
@@ -195,7 +232,9 @@ static void signal_handler(DBusGProxy *obj, const char *msg, GtkWidget *containe
         char str[10];
         snprintf(str, 10, "%ld:", workspace_id);
         GtkWidget *label = gtk_label_new(str);
-        gtk_widget_modify_fg(GTK_WIDGET(label), GTK_STATE_NORMAL, &color);
+        GdkColor color;
+        if (workspace_color(container, state, &color))
+            gtk_widget_modify_fg(GTK_WIDGET(label), GTK_STATE_NORMAL, &color);
         gtk_container_add(GTK_CONTAINER(box), label);
 
         while (*m != 0) {
@@ -342,9 +381,11 @@ static void update_reset_colors(GSettings *settings, const gchar *key, gpointer 
     gboolean changed = FALSE;
 
     for (guint i = 0; i < G_N_ELEMENTS(workspace_states); i++) {
-        gchar *value = g_settings_get_string(settings, workspace_states[i].key);
-        changed |= strcmp(value, workspace_states[i].fallback) != 0;
-        g_free(value);
+        GVariant *value = g_settings_get_value(settings, workspace_states[i].key);
+        GVariant *default_value = g_settings_get_default_value(settings, workspace_states[i].key);
+        changed |= !g_variant_equal(value, default_value);
+        g_variant_unref(value);
+        g_variant_unref(default_value);
     }
     gtk_widget_set_sensitive(GTK_WIDGET(button), changed);
 }
