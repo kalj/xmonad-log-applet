@@ -114,7 +114,8 @@ static void icon_click(GtkWidget *widget, GdkEventButton *event, gpointer xid) {
 }
 
 // Workspace states as marked by xmonad.hs, the GSettings key holding each
-// state's colour (MATE only), and the colour used when there is no setting
+// state's colour (MATE only), and the colour used when there is no setting.
+// The fallbacks must match the defaults in the GSettings schema.
 static const struct {
     char marker;
     const char *key;
@@ -328,6 +329,26 @@ static GtkWidget *color_row(GSettings *settings, GtkSizeGroup *labels,
     return row;
 }
 
+// "Reset Colours": put every workspace colour back to its schema default
+static void reset_colors(GtkButton *button, gpointer settings)
+{
+    for (guint i = 0; i < G_N_ELEMENTS(workspace_states); i++)
+        g_settings_reset(G_SETTINGS(settings), workspace_states[i].key);
+}
+
+// Only offer the reset when some colour differs from its default
+static void update_reset_colors(GSettings *settings, const gchar *key, gpointer button)
+{
+    gboolean changed = FALSE;
+
+    for (guint i = 0; i < G_N_ELEMENTS(workspace_states); i++) {
+        gchar *value = g_settings_get_string(settings, workspace_states[i].key);
+        changed |= strcmp(value, workspace_states[i].fallback) != 0;
+        g_free(value);
+    }
+    gtk_widget_set_sensitive(GTK_WIDGET(button), changed);
+}
+
 static void preferences_destroyed(GObject *applet, GtkWidget *dialog)
 {
     g_object_set_data(applet, "prefs-dialog", NULL);
@@ -380,6 +401,21 @@ static void show_preferences(GtkAction *action, gpointer applet)
                                      workspace_states[i].key),
                            FALSE, FALSE, 0);
     g_object_unref(labels);
+
+    GtkWidget *reset_row = gtk_hbox_new(FALSE, 0);
+    GtkWidget *reset = gtk_button_new_with_mnemonic("_Reset Colours");
+    gtk_widget_set_tooltip_text(reset, "Use the default colour for every workspace state");
+    g_signal_connect(reset, "clicked", G_CALLBACK(reset_colors), settings);
+    gtk_box_pack_start(GTK_BOX(reset_row), reset, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(rows), reset_row, FALSE, FALSE, 0);
+
+    // Keep the button's sensitivity up to date while the dialog is open
+    for (guint i = 0; i < G_N_ELEMENTS(workspace_states); i++) {
+        gchar *signal = g_strconcat("changed::", workspace_states[i].key, NULL);
+        g_signal_connect_object(settings, signal, G_CALLBACK(update_reset_colors), reset, 0);
+        g_free(signal);
+    }
+    update_reset_colors(settings, NULL, reset);
 
     // Forget the dialog when it closes, and close it if the applet is removed
     g_object_set_data(G_OBJECT(applet), "prefs-dialog", dialog);
