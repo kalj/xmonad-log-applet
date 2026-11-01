@@ -27,5 +27,15 @@
       <summary>Colour of urgent workspaces</summary>
       <description>Colour of the number for workspaces with a window asking for attention. A colour name or #rrggbb.</description>
     </key>
+    <key name="bold-numbers" type="b">
+      <default>false</default>
+      <summary>Bold workspace numbers</summary>
+      <description>Whether the workspace numbers are shown in bold.</description>
+    </key>
+    <key name="bold-title" type="b">
+      <default>false</default>
+      <summary>Bold window title</summary>
+      <description>Whether the title of the focused window is shown in bold.</description>
+    </key>
   </schema>
 </schemalist>

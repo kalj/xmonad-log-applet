@@ -148,11 +148,24 @@ static GSettingsSchema *appearance_schema(void)
         if (source != NULL)
             schema = g_settings_schema_source_lookup(source, XMONAD_LOG_APPLET_SCHEMA, TRUE);
         if (schema == NULL)
-            g_warning("GSettings schema %s not found, using theme colours",
+            g_warning("GSettings schema %s not found, using the theme's look",
                       XMONAD_LOG_APPLET_SCHEMA);
         looked_up = TRUE;
     }
     return schema;
+}
+
+// The schema default for an appearance key, or NULL if the schema is missing
+static GVariant *schema_default_value(const char *key)
+{
+    GSettingsSchema *schema = appearance_schema();
+    if (schema == NULL)
+        return NULL;
+
+    GSettingsSchemaKey *schema_key = g_settings_schema_get_key(schema, key);
+    GVariant *value = g_settings_schema_key_get_default_value(schema_key);
+    g_settings_schema_key_unref(schema_key);
+    return value;
 }
 
 // Parse a colour stored as a string ("red", "#3465a4", ...)
@@ -176,21 +189,50 @@ static gboolean workspace_color(GtkWidget *container, int state, GdkColor *color
         g_variant_unref(value);
     }
 
-    GSettingsSchema *schema = appearance_schema();
-    if (!found && schema != NULL) {
-        GSettingsSchemaKey *schema_key = g_settings_schema_get_key(schema, key);
-        GVariant *value = g_settings_schema_key_get_default_value(schema_key);
-        found = parse_color_variant(value, color);
-        g_variant_unref(value);
-        g_settings_schema_key_unref(schema_key);
+    if (!found) {
+        GVariant *value = schema_default_value(key);
+        if (value != NULL) {
+            found = parse_color_variant(value, color);
+            g_variant_unref(value);
+        }
     }
     return found;
+}
+
+// A boolean appearance setting: the user's setting where there are
+// settings, otherwise the schema default, otherwise FALSE
+static gboolean appearance_boolean(GtkWidget *container, const char *key)
+{
+    GSettings *settings = g_object_get_data(G_OBJECT(container), "settings");
+    if (settings != NULL)
+        return g_settings_get_boolean(settings, key);
+
+    GVariant *value = schema_default_value(key);
+    if (value == NULL)
+        return FALSE;
+    gboolean result = g_variant_get_boolean(value);
+    g_variant_unref(value);
+    return result;
+}
+
+// A label showing text as is (no markup, so window titles need no
+// escaping), optionally in bold
+static GtkWidget *text_label(const char *text, gboolean bold)
+{
+    GtkWidget *label = gtk_label_new(text);
+    if (bold) {
+        PangoAttrList *attrs = pango_attr_list_new();
+        pango_attr_list_insert(attrs, pango_attr_weight_new(PANGO_WEIGHT_BOLD));
+        gtk_label_set_attributes(GTK_LABEL(label), attrs);
+        pango_attr_list_unref(attrs);
+    }
+    return label;
 }
 
 // DBUS
 static void signal_handler(DBusGProxy *obj, const char *msg, GtkWidget *container)
 {
-    // Remember the message, so it can be redrawn when the colours change
+    // Remember the message, so it can be redrawn when the appearance changes
     if (msg != g_object_get_data(G_OBJECT(container), "last-msg")) {
         char *copy = g_strdup(msg);
         g_object_set_data_full(G_OBJECT(container), "last-msg", copy, g_free);
@@ -204,6 +246,9 @@ static void signal_handler(DBusGProxy *obj, const char *msg, GtkWidget *containe
         gtk_widget_destroy(GTK_WIDGET(iter->data));
     }
     g_list_free(children);
+
+    gboolean bold_numbers = appearance_boolean(container, "bold-numbers");
+    gboolean bold_title = appearance_boolean(container, "bold-title");
 
     // Parse msg and repopulate container
     char *m = (char *)msg;
@@ -231,7 +276,7 @@ static void signal_handler(DBusGProxy *obj, const char *msg, GtkWidget *containe
 
         char str[10];
         snprintf(str, 10, "%ld:", workspace_id);
-        GtkWidget *label = gtk_label_new(str);
+        GtkWidget *label = text_label(str, bold_numbers);
         GdkColor color;
         if (workspace_color(container, state, &color))
             gtk_widget_modify_fg(GTK_WIDGET(label), GTK_STATE_NORMAL, &color);
@@ -263,7 +308,7 @@ static void signal_handler(DBusGProxy *obj, const char *msg, GtkWidget *containe
     }
 
     // Window title
-    GtkWidget *label = gtk_label_new(m);
+    GtkWidget *label = text_label(m, bold_title);
     gtk_container_add(GTK_CONTAINER(container), label);
 
     gtk_widget_show_all(container);
@@ -320,9 +365,13 @@ static void apply_expand_setting(GSettings *settings, const gchar *key, gpointer
     mate_panel_applet_set_flags(MATE_PANEL_APPLET(applet), flags);
 }
 
-// Redraw the workspaces with the last message, e.g. after a colour change
+// Redraw the workspaces with the last message when a setting that affects
+// them changes (all settings but "expand" do)
 static void redraw_workspaces(GSettings *settings, const gchar *key, gpointer container)
 {
+    if (g_strcmp0(key, "expand") == 0)
+        return;
+
     const char *msg = g_object_get_data(G_OBJECT(container), "last-msg");
     if (msg != NULL)
         signal_handler(NULL, msg, GTK_WIDGET(container));
@@ -390,6 +439,34 @@ static void update_reset_colors(GSettings *settings, const gchar *key, gpointer 
     gtk_widget_set_sensitive(GTK_WIDGET(button), changed);
 }
 
+// A titled section in the preferences dialog: a bold heading followed by
+// an indented box, which is returned for the section's rows
+static GtkWidget *dialog_section(GtkWidget *vbox, const char *title)
+{
+    GtkWidget *heading = gtk_label_new(NULL);
+    gchar *markup = g_markup_printf_escaped("<b>%s</b>", title);
+    gtk_label_set_markup(GTK_LABEL(heading), markup);
+    g_free(markup);
+    gtk_misc_set_alignment(GTK_MISC(heading), 0, 0.5);
+    gtk_box_pack_start(GTK_BOX(vbox), heading, FALSE, FALSE, 6);
+
+    GtkWidget *indent = gtk_hbox_new(FALSE, 0);
+    GtkWidget *rows = gtk_vbox_new(FALSE, 6);
+    gtk_box_pack_start(GTK_BOX(indent), rows, FALSE, FALSE, 12);
+    gtk_box_pack_start(GTK_BOX(vbox), indent, FALSE, FALSE, 0);
+    return rows;
+}
+
+// A check button bound to a boolean key
+static GtkWidget *check_row(GSettings *settings, const char *label_text,
+                            const char *tooltip, const char *key)
+{
+    GtkWidget *check = gtk_check_button_new_with_mnemonic(label_text);
+    gtk_widget_set_tooltip_text(check, tooltip);
+    g_settings_bind(settings, key, check, "active", G_SETTINGS_BIND_DEFAULT);
+    return check;
+}
+
 static void preferences_destroyed(GObject *applet, GtkWidget *dialog)
 {
     g_object_set_data(applet, "prefs-dialog", NULL);
@@ -419,21 +496,14 @@ static void show_preferences(GtkAction *action, gpointer applet)
     gtk_container_set_border_width(GTK_CONTAINER(vbox), 12);
     gtk_container_add(GTK_CONTAINER(gtk_dialog_get_content_area(GTK_DIALOG(dialog))), vbox);
 
-    GtkWidget *expand = gtk_check_button_new_with_mnemonic("_Expand to fill panel");
-    gtk_widget_set_tooltip_text(expand, "Let the applet take up all free space along the panel");
-    g_settings_bind(settings, "expand", expand, "active", G_SETTINGS_BIND_DEFAULT);
-    gtk_box_pack_start(GTK_BOX(vbox), expand, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(vbox),
+                       check_row(settings, "_Expand to fill panel",
+                                 "Let the applet take up all free space along the panel",
+                                 "expand"),
+                       FALSE, FALSE, 0);
 
-    // Workspace colours: a bold heading, then one indented row per state
-    GtkWidget *heading = gtk_label_new(NULL);
-    gtk_label_set_markup(GTK_LABEL(heading), "<b>Workspace Colours</b>");
-    gtk_misc_set_alignment(GTK_MISC(heading), 0, 0.5);
-    gtk_box_pack_start(GTK_BOX(vbox), heading, FALSE, FALSE, 6);
-
-    GtkWidget *indent = gtk_hbox_new(FALSE, 0);
-    GtkWidget *rows = gtk_vbox_new(FALSE, 6);
-    gtk_box_pack_start(GTK_BOX(indent), rows, FALSE, FALSE, 12);
-    gtk_box_pack_start(GTK_BOX(vbox), indent, FALSE, FALSE, 0);
+    // Workspace colours: one row per state, and a reset button
+    GtkWidget *rows = dialog_section(vbox, "Workspace Colours");
 
     GtkSizeGroup *labels = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
     for (guint i = 0; i < G_N_ELEMENTS(workspace_states); i++)
@@ -458,6 +528,17 @@ static void show_preferences(GtkAction *action, gpointer applet)
     }
     update_reset_colors(settings, NULL, reset);
 
+    // Text style
+    GtkWidget *text_rows = dialog_section(vbox, "Text");
+    gtk_box_pack_start(GTK_BOX(text_rows),
+                       check_row(settings, "_Bold workspace numbers",
+                                 "Show the workspace numbers in bold", "bold-numbers"),
+                       FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(text_rows),
+                       check_row(settings, "Bold window _title",
+                                 "Show the title of the focused window in bold", "bold-title"),
+                       FALSE, FALSE, 0);
+
     // Forget the dialog when it closes, and close it if the applet is removed
     g_object_set_data(G_OBJECT(applet), "prefs-dialog", dialog);
     g_signal_connect_object(dialog, "destroy", G_CALLBACK(preferences_destroyed),
@@ -474,13 +555,9 @@ static void set_up_settings_and_menu(MatePanelApplet *applet, GtkWidget *contain
     GSettings *settings = mate_panel_applet_settings_new(applet, XMONAD_LOG_APPLET_SCHEMA);
     g_object_set_data_full(G_OBJECT(applet), "settings", settings, g_object_unref);
 
-    // The workspace colours are read in signal_handler, via the container
+    // The appearance settings are read in signal_handler, via the container
     g_object_set_data(G_OBJECT(container), "settings", settings);
-    for (guint i = 0; i < G_N_ELEMENTS(workspace_states); i++) {
-        gchar *signal = g_strconcat("changed::", workspace_states[i].key, NULL);
-        g_signal_connect_object(settings, signal, G_CALLBACK(redraw_workspaces), container, 0);
-        g_free(signal);
-    }
+    g_signal_connect_object(settings, "changed", G_CALLBACK(redraw_workspaces), container, 0);
 
     g_signal_connect(settings, "changed::expand", G_CALLBACK(apply_expand_setting), applet);
     apply_expand_setting(settings, "expand", applet);
