@@ -232,11 +232,13 @@ static void set_up_dbus_transfer(GtkWidget *buf)
 #ifdef PANEL_MATE
 // Appearance settings
 static const char menu_xml[] =
-    "<menuitem name=\"Expand\" action=\"Expand\" />";
+    "<menuitem name=\"Preferences\" action=\"Preferences\" />";
 
-static const GtkToggleActionEntry menu_toggle_actions[] = {
-    { "Expand", NULL, "_Expand to Fill Panel", NULL,
-      "Let the applet take up all free space along the panel", NULL, TRUE },
+static void show_preferences(GtkAction *action, gpointer applet);
+
+static const GtkActionEntry menu_actions[] = {
+    { "Preferences", "document-properties", "_Preferences", NULL,
+      "Configure the appearance of the applet", G_CALLBACK(show_preferences) },
 };
 
 // Apply the "expand" setting as MATE_PANEL_APPLET_EXPAND_MAJOR
@@ -252,23 +254,61 @@ static void apply_expand_setting(GSettings *settings, const gchar *key, gpointer
     mate_panel_applet_set_flags(MATE_PANEL_APPLET(applet), flags);
 }
 
+static void preferences_destroyed(GObject *applet, GtkWidget *dialog)
+{
+    g_object_set_data(applet, "prefs-dialog", NULL);
+}
+
+// Open the preferences dialog, or raise it if it is already open. Changes
+// are written to GSettings, and so applied, as soon as they are made.
+static void show_preferences(GtkAction *action, gpointer applet)
+{
+    GtkWidget *dialog = g_object_get_data(G_OBJECT(applet), "prefs-dialog");
+    if (dialog != NULL) {
+        gtk_window_present(GTK_WINDOW(dialog));
+        return;
+    }
+
+    GSettings *settings = g_object_get_data(G_OBJECT(applet), "settings");
+
+    dialog = gtk_dialog_new_with_buttons(
+        "Xmonad Log Applet Preferences", NULL, 0,
+        "_Close", GTK_RESPONSE_CLOSE,
+        NULL);
+    gtk_window_set_screen(GTK_WINDOW(dialog), gtk_widget_get_screen(GTK_WIDGET(applet)));
+    gtk_window_set_resizable(GTK_WINDOW(dialog), FALSE);
+    g_signal_connect(dialog, "response", G_CALLBACK(gtk_widget_destroy), NULL);
+
+    GtkWidget *vbox = gtk_vbox_new(FALSE, 6);
+    gtk_container_set_border_width(GTK_CONTAINER(vbox), 12);
+    gtk_container_add(GTK_CONTAINER(gtk_dialog_get_content_area(GTK_DIALOG(dialog))), vbox);
+
+    GtkWidget *expand = gtk_check_button_new_with_mnemonic("_Expand to fill panel");
+    gtk_widget_set_tooltip_text(expand, "Let the applet take up all free space along the panel");
+    g_settings_bind(settings, "expand", expand, "active", G_SETTINGS_BIND_DEFAULT);
+    gtk_box_pack_start(GTK_BOX(vbox), expand, FALSE, FALSE, 0);
+
+    // Forget the dialog when it closes, and close it if the applet is removed
+    g_object_set_data(G_OBJECT(applet), "prefs-dialog", dialog);
+    g_signal_connect_object(dialog, "destroy", G_CALLBACK(preferences_destroyed),
+                            applet, G_CONNECT_SWAPPED);
+    g_signal_connect_object(applet, "destroy", G_CALLBACK(gtk_widget_destroy),
+                            dialog, G_CONNECT_SWAPPED);
+
+    gtk_widget_show_all(dialog);
+}
+
 static void set_up_settings_and_menu(MatePanelApplet *applet)
 {
     // Per-applet-instance settings; owned by the applet from here on
     GSettings *settings = mate_panel_applet_settings_new(applet, XMONAD_LOG_APPLET_SCHEMA);
     g_object_set_data_full(G_OBJECT(applet), "settings", settings, g_object_unref);
 
-    GtkActionGroup *actions = gtk_action_group_new("XmonadLogAppletActions");
-    gtk_action_group_add_toggle_actions(
-        actions, menu_toggle_actions, G_N_ELEMENTS(menu_toggle_actions), applet);
-
-    // The check item and the setting mirror each other, both ways
-    g_settings_bind(settings, "expand",
-                    gtk_action_group_get_action(actions, "Expand"), "active",
-                    G_SETTINGS_BIND_DEFAULT);
     g_signal_connect(settings, "changed::expand", G_CALLBACK(apply_expand_setting), applet);
     apply_expand_setting(settings, "expand", applet);
 
+    GtkActionGroup *actions = gtk_action_group_new("XmonadLogAppletActions");
+    gtk_action_group_add_actions(actions, menu_actions, G_N_ELEMENTS(menu_actions), applet);
     mate_panel_applet_setup_menu(applet, menu_xml, actions);
     g_object_unref(actions);
 }
