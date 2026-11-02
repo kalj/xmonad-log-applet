@@ -39,7 +39,7 @@ getWellKnownName dbus = do
 dbusOutput :: D.Client -> String -> IO ()
 dbusOutput dbus str = do
     let signal = (D.signal (D.objectPath_ "/org/xmonad/Log") (D.interfaceName_ "org.xmonad.Log") (D.memberName_ "Update")) {
-            D.signalBody = [D.toVariant ("<b>" ++ (UTF8.decodeString str) ++ "</b>")]
+            D.signalBody = [D.toVariant (UTF8.decodeString str)]
         }
     D.emit dbus signal
 
@@ -99,7 +99,7 @@ iconsAppletFormatStack s = case s of
   Nothing -> ""
 
 iconsAppletPP :: PP
-iconsAppletPP = defaultPP {
+iconsAppletPP = def {
     ppTitle    = ("|" ++)
   , ppCurrent  = ("*" ++)
   , ppVisible  = ("+" ++)

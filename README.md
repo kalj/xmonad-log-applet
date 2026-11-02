@@ -1,17 +1,47 @@
 # xmonad-log-applet
 
 ## This Fork
-This fork has the [3 unapplied pull requests](https://github.com/alexkay/xmonad-log-applet/pulls) from master. 
-The master version appears to be unmaintained. In particular for me, the log-applet would not function
-without [Nylen's](https://github.com/nylen) dbus [type cast fix](https://github.com/alexkay/xmonad-log-applet/pull/16).
-I am happy to keep this up to date, but know that __I barely know Haskell__ and that is mostly because of Xmonad. I am primarily a Clojure programmer.
-I can be reached at <e.a.gebhart@gmail.com>
+
+This fork changes what the applet shows. Instead of displaying text formatted
+by xmonad, it draws each workspace number followed by the icons of its windows,
+then the title of the focused window. Click an icon to activate that window.
+
+It builds on two earlier versions, both of which appear to be inactive:
+
+* [alexkay/xmonad-log-applet](https://github.com/alexkay/xmonad-log-applet), the
+  original, last changed in 2013 (version 2.1.0).
+* [EricGebhart/xmonad-log-applet](https://github.com/EricGebhart/xmonad-log-applet),
+  which added the three pull requests still open on the original: the
+  [D-Bus type fix](https://github.com/alexkay/xmonad-log-applet/pull/16),
+  [libmatepanelapplet 4.0](https://github.com/alexkay/xmonad-log-applet/pull/15)
+  and [newer libpanel-applet](https://github.com/alexkay/xmonad-log-applet/pull/17)
+  support.
+
+This fork includes all of that and adds:
+
+* **Window icons and colours**, from [hamax's fork](https://github.com/hamax/xmonad-log-applet):
+  icons, click-to-activate, and separate colours for current, visible, hidden
+  and urgent workspaces.
+* **Preferences dialog (MATE only):** right-click the applet to set expand to
+  fill panel, workspace colours, bold text and a maximum title width. Settings
+  are stored per applet with GSettings.
+* **GNOME panel fixes:** in-process applet support for libpanel-applet >= 3.22,
+  from [u-quark](https://github.com/u-quark/xmonad-log-applet).
+* **Debian packaging** for the MATE applet (see `debian/`).
+
+**This fork is not a drop-in replacement.** The applet expects its own message
+format rather than Pango markup, so a config written for the other versions
+leaves it blank. Use the [`xmonad.hs`](xmonad.hs) in this repository as your
+starting point. Workspace names must be non-zero numbers.
+
+Please report problems on [this fork's issue tracker](https://github.com/kalj/xmonad-log-applet/issues).
 
 --------------------
 
 xmonad-log-applet is for Xmonad users who find the GNOME, MATE, or Xfce panel
-useful. The applet will show the active workspaces, the title of the selected
-window or whatever information you send it from your xmonad.hs.
+useful. The applet will show your workspaces, the icons of their windows and
+the title of the selected window, using the information sent from your
+xmonad.hs.
 
 xmonad-log-applet was originally written by Adam Wick, you can get more details
 on the [old website][0].
@@ -22,12 +52,10 @@ There are two pieces of setup you'll need to get this working, assuming you are
 already running Xmonad within [GNOME][1], MATE or [Xfce][2]:
 
 * An xmonad.hs setup file that will send properly-formatted information to
-  D-Bus. You can use [this xmonad.hs][3] as an example; obviously, feel free to
-  change the colours to match your tastes.
+  D-Bus. You can use [this xmonad.hs][3] as an example.
 
-* The panel applet. You can either get the current stable build as a
-  [tarball][4], or pull the latest version from the git repository: `git clone
-  git://github.com/alexkay/xmonad-log-applet.git`
+* The panel applet. Pull the latest version from the git repository: `git clone
+  https://github.com/kalj/xmonad-log-applet.git`
 
 The applet supports GNOME 2, GNOME Flashback, MATE and Xfce 4 panels, just pass
 `--with-panel=X` to `./configure` when compiling, where X is one of gnome2,
@@ -49,13 +77,12 @@ If you are compiling from a git clone, you should run `./autogen.sh` instead of
 
 ## Contact
 
-If you have any questions, comments or bug reports, please contact me via GitHub
-or drop me a line at <alexander@kojevnikov.com>.
+If you have any questions, comments or bug reports, please open an issue on
+[GitHub](https://github.com/kalj/xmonad-log-applet/issues).
 
 [0]: http://uhsure.com/xmonad-log-applet.html
 [1]: http://www.haskell.org/haskellwiki/Xmonad/Using_xmonad_in_Gnome
 [2]: http://www.haskell.org/haskellwiki/Xmonad/Using_xmonad_in_XFCE
-[3]: https://github.com/alexkay/xmonad-log-applet/blob/master/xmonad.hs
-[4]: https://xmonad-log-applet.googlecode.com/files/xmonad-log-applet-2.1.0.tar.gz
+[3]: xmonad.hs
 [5]: http://hackage.haskell.org/package/dbus
 [6]: http://versia.com/2011/09/xmonad-log-applet-gnome-xfce/
