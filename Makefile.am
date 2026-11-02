@@ -88,6 +88,11 @@ org.mate.panel.applet.XmonadLogAppletFactory.service: $(service_in_files)
 	$(SED) -e "s|\@PLUGIN_DIR\@|$(PLUGIN_DIR)|" $< > $@
 endif
 
+# Installed for all panels: the defaults are read from it everywhere, even
+# though only MATE stores settings with it so far
+gsettings_SCHEMAS = org.mate.panel.applet.xmonad-log.gschema.xml
+@GSETTINGS_RULES@
+
 DISTCLEANFILES = \
 	$(applet_DATA) \
 	$(service_DATA)
@@ -102,6 +107,7 @@ EXTRA_DIST = \
 	org.gnome.panel.applet.XmonadLogAppletFactory.service.in \
 	org.mate.panel.XmonadLogApplet.mate-panel-applet.in \
 	org.mate.panel.applet.XmonadLogAppletFactory.service.in \
+	org.mate.panel.applet.xmonad-log.gschema.xml \
 	xmonad-log-applet.desktop.in
 
 gtk_update_icon_cache = gtk-update-icon-cache -f -t

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <!-- Relocatable: mate-panel gives each applet instance its own path -->
+  <schema id="org.mate.panel.applet.xmonad-log">
+    <key name="expand" type="b">
+      <default>true</default>
+      <summary>Expand to fill panel</summary>
+      <description>Whether the applet takes up all free space along the panel (MATE_PANEL_APPLET_EXPAND_MAJOR).</description>
+    </key>
+    <key name="color-current" type="s">
+      <default>'green'</default>
+      <summary>Colour of current workspaces</summary>
+      <description>Colour of the number for the workspace shown on the focused screen. A colour name or #rrggbb.</description>
+    </key>
+    <key name="color-visible" type="s">
+      <default>'yellow'</default>
+      <summary>Colour of visible workspaces</summary>
+      <description>Colour of the number for workspaces shown on other screens. A colour name or #rrggbb.</description>
+    </key>
+    <key name="color-hidden" type="s">
+      <default>'white'</default>
+      <summary>Colour of hidden workspaces</summary>
+      <description>Colour of the number for workspaces that are not shown on any screen. A colour name or #rrggbb.</description>
+    </key>
+    <key name="color-urgent" type="s">
+      <default>'red'</default>
+      <summary>Colour of urgent workspaces</summary>
+      <description>Colour of the number for workspaces with a window asking for attention. A colour name or #rrggbb.</description>
+    </key>
+    <key name="bold-numbers" type="b">
+      <default>false</default>
+      <summary>Bold workspace numbers</summary>
+      <description>Whether the workspace numbers are shown in bold.</description>
+    </key>
+    <key name="bold-title" type="b">
+      <default>false</default>
+      <summary>Bold window title</summary>
+      <description>Whether the title of the focused window is shown in bold.</description>
+    </key>
+    <key name="title-max-width" type="i">
+      <range min="0" max="1000"/>
+      <default>0</default>
+      <summary>Maximum window title width</summary>
+      <description>Maximum width of the window title, in characters. Longer titles are shortened with an ellipsis. 0 means no limit.</description>
+    </key>
+  </schema>
+</schemalist>
