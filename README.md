@@ -31,8 +31,9 @@ This fork includes all of that and adds:
 
 **This fork is not a drop-in replacement.** The applet expects its own message
 format rather than Pango markup, so a config written for the other versions
-leaves it blank. Use the [`xmonad.hs`](xmonad.hs) in this repository as your
-starting point. Workspace names must be non-zero numbers.
+shows little more than the window title. Use the [`xmonad.hs`](xmonad.hs) in
+this repository as your starting point. Workspace names must be non-zero
+numbers; other workspaces are left out, with a warning in the panel's log.
 
 Please report problems on [this fork's issue tracker](https://github.com/kalj/xmonad-log-applet/issues).
 
