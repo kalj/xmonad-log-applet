@@ -1,9 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+-- Sample xmonad.hs for xmonad-log-applet. Needs xmonad and xmonad-contrib
+-- 0.17 or later, and the Haskell dbus and utf8-string packages.
+
 import XMonad
 import XMonad.Config.Gnome
-import XMonad.Hooks.DynamicLog
 import XMonad.Hooks.EwmhDesktops
+import XMonad.Hooks.StatusBar.PP
 import XMonad.Hooks.UrgencyHook
 import XMonad.Util.NamedWindows
 import XMonad.Util.WorkspaceCompare
@@ -21,9 +24,11 @@ main :: IO ()
 main = do
   dbus <- D.connectSession
   getWellKnownName dbus
-  xmonad $ ewmh gnomeConfig {
-    logHook = iconsAppletLog dbus
-  , handleEventHook = handleEventHook gnomeConfig <+> fullscreenEventHook
+  -- gnomeConfig already includes the EWMH hooks, so keep its logHook and
+  -- run ours after it. The urgency hook lets readUrgents (below) see urgent
+  -- windows, for the applet's urgent workspace colour.
+  xmonad $ withUrgencyHook NoUrgencyHook $ ewmhFullscreen gnomeConfig {
+    logHook = logHook gnomeConfig >> iconsAppletLog dbus
   }
 
 --
@@ -32,7 +37,7 @@ main = do
 
 getWellKnownName :: D.Client -> IO ()
 getWellKnownName dbus = do
-  D.requestName dbus (D.busName_ "org.xmonad.Log")
+  _ <- D.requestName dbus (D.busName_ "org.xmonad.Log")
                 [D.nameAllowReplacement, D.nameReplaceExisting, D.nameDoNotQueue]
   return ()
 
