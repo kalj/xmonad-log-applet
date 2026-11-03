@@ -40,29 +40,70 @@ static void pixbuff_free(guchar *pixels, gpointer data) {
 }
 
 // XCB
-xcb_connection_t *c;
-xcb_ewmh_connection_t ewmh;
-int screen_number;
-static void xcb_init() {
+// One X connection, shared by every applet instance in the process. It is
+// set up by xcb_init and is only usable while xcb_ready is TRUE.
+static xcb_connection_t *c = NULL;
+static xcb_ewmh_connection_t ewmh;
+static int screen_number;
+static gboolean xcb_ready = FALSE;
+
+// Connect to X and fetch the EWMH atoms, unless that has already been done.
+// Returns TRUE if the connection is usable. On failure everything is cleaned
+// up, so that a later call (e.g. from another applet instance) can retry.
+static gboolean xcb_init(void) {
     xcb_intern_atom_cookie_t *atom_cookie;
 
-    // Connect to X and request the icon
+    if (xcb_ready)
+        return TRUE;
+
     c = xcb_connect(NULL, &screen_number);
+    if (c == NULL || xcb_connection_has_error(c)) {
+        g_warning("Can not connect to the X server; window icons will not be shown");
+        goto fail;
+    }
+
     atom_cookie = xcb_ewmh_init_atoms(c, &ewmh);
     if (atom_cookie == NULL) {
-        fprintf(stderr, "Can not request atoms\n");
-        xcb_disconnect(c);
-        return;
+        g_warning("Can not request EWMH atoms; window icons will not be shown");
+        goto fail;
     }
 
+    // On failure this frees what xcb_ewmh_init_atoms allocated
     if (!xcb_ewmh_init_atoms_replies(&ewmh, atom_cookie, NULL)) {
-        fprintf(stderr, "Can not get atom replies\n");
-        xcb_disconnect(c);
-        return;
+        g_warning("Can not get EWMH atom replies; window icons will not be shown");
+        goto fail;
     }
+
+    xcb_ready = TRUE;
+    return TRUE;
+
+fail:
+    if (c != NULL)
+        xcb_disconnect(c);
+    c = NULL;
+    return FALSE;
 }
 
-// Get icon using XCB
+// A generic icon for windows that have none (or when X is not available)
+static GtkWidget *fallback_icon(void)
+{
+    static const char *names[] = { "application-x-executable", "image-missing" };
+    GtkIconTheme *theme = gtk_icon_theme_get_default();
+
+    for (guint i = 0; i < G_N_ELEMENTS(names); i++) {
+        GdkPixbuf *pixbuf = gtk_icon_theme_load_icon(theme, names[i], 20,
+                                                     GTK_ICON_LOOKUP_FORCE_SIZE, NULL);
+        if (pixbuf != NULL) {
+            GtkWidget *widget = gtk_image_new_from_pixbuf(pixbuf);
+            g_object_unref(G_OBJECT(pixbuf));
+            return widget;
+        }
+    }
+    return gtk_image_new_from_icon_name(names[0], GTK_ICON_SIZE_MENU);
+}
+
+// Get icon using XCB. Windows without an icon (which is perfectly normal)
+// get a generic one, so that they still show up and can be clicked.
 static GtkWidget* get_icon(long xid)
 {
     xcb_window_t w = xid;
@@ -70,18 +111,20 @@ static GtkWidget* get_icon(long xid)
     xcb_ewmh_get_wm_icon_reply_t wm_icon;
     int i;
 
+    if (!xcb_ready)
+        return fallback_icon();
+
     prop_cookie = xcb_ewmh_get_wm_icon(&ewmh, w);
-    if (!xcb_ewmh_get_wm_icon_reply(&ewmh, prop_cookie, &wm_icon, NULL)) {
-        fprintf(stderr, "Can not get icon (window got no icon?)\n");
-        return NULL;
-    }
+    if (!xcb_ewmh_get_wm_icon_reply(&ewmh, prop_cookie, &wm_icon, NULL))
+        return fallback_icon();
 
     // Take the first icon (sometimes the icon is in multiple resolutions)
     xcb_ewmh_wm_icon_iterator_t iterator = xcb_ewmh_get_wm_icon_iterator(&wm_icon);
 
-    if (iterator.data == NULL) {
-        // No icon
-        return NULL;
+    if (iterator.data == NULL || iterator.width == 0 || iterator.height == 0) {
+        // No usable icon
+        xcb_ewmh_get_wm_icon_reply_wipe(&wm_icon);
+        return fallback_icon();
     }
 
     // RGBA <-> BGRA
@@ -109,10 +152,18 @@ static GtkWidget* get_icon(long xid)
     return widget;
 }
 
-// Change active window on icon click
-static void icon_click(GtkWidget *widget, GdkEventButton *event, gpointer xid) {
-    xcb_ewmh_request_change_active_window(&ewmh, screen_number, (xcb_window_t)xid, XCB_EWMH_CLIENT_SOURCE_TYPE_OTHER, XCB_CURRENT_TIME, XCB_NONE);
+// Change active window on a left click on its icon. Other buttons (and
+// double clicks) are not handled, so e.g. a right click still reaches the
+// panel and opens its menu.
+static gboolean icon_click(GtkWidget *widget, GdkEventButton *event, gpointer xid) {
+    if (event->type != GDK_BUTTON_PRESS || event->button != 1)
+        return FALSE;
+    if (!xcb_ready)
+        return FALSE;
+
+    xcb_ewmh_request_change_active_window(&ewmh, screen_number, (xcb_window_t)GPOINTER_TO_SIZE(xid), XCB_EWMH_CLIENT_SOURCE_TYPE_OTHER, XCB_CURRENT_TIME, XCB_NONE);
     xcb_flush(c);
+    return TRUE;
 }
 
 // Workspace states as marked by xmonad.hs, the GSettings key holding each
@@ -267,7 +318,9 @@ static void signal_handler(DBusGProxy *obj, const char *msg, GtkWidget *containe
     gboolean bold_title = appearance_boolean(container, "bold-title");
     gint title_max_width = appearance_int(container, "title-max-width");
 
-    // Parse msg and repopulate container
+    // Parse msg and repopulate container. A malformed workspace is skipped
+    // (and reported), rather than throwing away the whole update.
+    GString *problems = g_string_new(NULL);
     char *m = (char *)msg;
     while (*m != 0) {
         if (*m == '|') {
@@ -275,24 +328,31 @@ static void signal_handler(DBusGProxy *obj, const char *msg, GtkWidget *containe
             break;
         }
 
+        char *ws_start = m;
+        const char *problem = NULL;
+        GtkWidget *box = NULL;
+
         int state = workspace_state(*m);
         if (state < 0) {
-            return;
+            problem = "unknown workspace state marker";
+            goto skip_workspace;
         }
         m++;
 
+        char *id_start = m;
         long workspace_id = strtol(m, &m, 0);
 
-        if (*m != ':' || workspace_id == 0) {
-            return;
+        if (m == id_start || *m != ':' || workspace_id == 0) {
+            problem = "workspace name is not a non-zero number";
+            goto skip_workspace;
         }
         m++;
 
-        GtkWidget *box = gtk_hbox_new(FALSE,2);
+        box = gtk_hbox_new(FALSE,2);
         gtk_container_add(GTK_CONTAINER(container), box);
 
-        char str[10];
-        snprintf(str, 10, "%ld:", workspace_id);
+        char str[24];
+        snprintf(str, sizeof(str), "%ld:", workspace_id);
         GtkWidget *label = text_label(str, bold_numbers);
         GdkColor color;
         if (workspace_color(container, state, &color))
@@ -304,13 +364,11 @@ static void signal_handler(DBusGProxy *obj, const char *msg, GtkWidget *containe
 
             if (xid != 0) {
                 GtkWidget *icon = get_icon(xid);
-                if (icon != NULL) {
-                    GtkWidget *eventbox = gtk_event_box_new();
-                    gtk_event_box_set_visible_window(GTK_EVENT_BOX(eventbox), FALSE);
-                    gtk_container_add(GTK_CONTAINER(eventbox), icon);
-                    gtk_container_add(GTK_CONTAINER(box), eventbox);
-                    g_signal_connect(G_OBJECT(eventbox), "button_press_event", G_CALLBACK(icon_click), (gpointer)xid);
-                }
+                GtkWidget *eventbox = gtk_event_box_new();
+                gtk_event_box_set_visible_window(GTK_EVENT_BOX(eventbox), FALSE);
+                gtk_container_add(GTK_CONTAINER(eventbox), icon);
+                gtk_container_add(GTK_CONTAINER(box), eventbox);
+                g_signal_connect(G_OBJECT(eventbox), "button_press_event", G_CALLBACK(icon_click), GSIZE_TO_POINTER(xid));
             }
 
             if (*m == ';') {
@@ -318,10 +376,42 @@ static void signal_handler(DBusGProxy *obj, const char *msg, GtkWidget *containe
                 break;
             }
             if (*m != ',') {
-                return;
+                if (*m != 0) {
+                    problem = "malformed window list";
+                    goto skip_workspace;
+                }
+                break;
             }
             m++;
         }
+        continue;
+
+    skip_workspace:
+        // Drop what was built of the offending workspace and report it, then
+        // continue after it. The list ends with ';' before the title's '|'.
+        if (box != NULL)
+            gtk_widget_destroy(box);
+        m = ws_start;
+        while (*m != 0 && *m != ';' && *m != '|')
+            m++;
+        g_string_append_printf(problems, "%s%s: \"%.*s\"",
+                               problems->len > 0 ? "; " : "", problem,
+                               (int)(m - ws_start), ws_start);
+        if (*m == ';')
+            m++;
+    }
+
+    // Report problems, but only when they change, to avoid flooding the log
+    // with the same complaint on every update
+    const char *last_problems = g_object_get_data(G_OBJECT(container), "last-problems");
+    if (g_strcmp0(problems->str, last_problems ? last_problems : "") != 0) {
+        if (problems->len > 0)
+            g_warning("Ignoring malformed workspaces in message from xmonad (%s). "
+                      "See xmonad.hs for the expected format.", problems->str);
+        g_object_set_data_full(G_OBJECT(container), "last-problems",
+                               g_string_free(problems, FALSE), g_free);
+    } else {
+        g_string_free(problems, TRUE);
     }
 
     // Window title. A title longer than the limit is shortened with "...",
@@ -669,6 +759,8 @@ static void xmonad_log_applet_fill(GtkContainer *container)
 #ifdef PANEL_MATE
     set_up_settings_and_menu(applet, box);
 #endif
+    // Without X the applet still works, just with generic icons that can't
+    // be clicked; xcb_init has already explained why
     xcb_init();
     set_up_dbus_transfer(box);
 
