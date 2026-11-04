@@ -19,6 +19,8 @@
 #include <dbus/dbus.h>
 #include <xcb/xcb_ewmh.h>
 
+#include "parser.h"
+
 // GSettings schema with the appearance settings and their defaults. It is
 // installed for all panels, but only MATE stores settings with it so far.
 #define XMONAD_LOG_APPLET_SCHEMA "org.mate.panel.applet.xmonad-log"
@@ -179,6 +181,17 @@ static const struct {
     { '!', "color-urgent",  "_Urgent:"  },
 };
 
+// All the state markers, for the parser
+static const char *state_markers(void)
+{
+    static char markers[G_N_ELEMENTS(workspace_states) + 1];
+
+    if (markers[0] == 0)
+        for (guint i = 0; i < G_N_ELEMENTS(workspace_states); i++)
+            markers[i] = workspace_states[i].marker;
+    return markers;
+}
+
 // Index into workspace_states for a state marker, or -1 if it is unknown
 static int workspace_state(char marker)
 {
@@ -318,108 +331,54 @@ static void signal_handler(DBusGProxy *obj, const char *msg, GtkWidget *containe
     gboolean bold_title = appearance_boolean(container, "bold-title");
     gint title_max_width = appearance_int(container, "title-max-width");
 
-    // Parse msg and repopulate container. A malformed workspace is skipped
+    // Parse msg and repopulate container. A malformed workspace is left out
     // (and reported), rather than throwing away the whole update.
-    GString *problems = g_string_new(NULL);
-    char *m = (char *)msg;
-    while (*m != 0) {
-        if (*m == '|') {
-            m++;
-            break;
-        }
+    XlaMessage *message = xla_message_parse(msg, state_markers());
 
-        char *ws_start = m;
-        const char *problem = NULL;
-        GtkWidget *box = NULL;
+    for (guint i = 0; i < message->workspaces->len; i++) {
+        XlaWorkspace *ws = g_ptr_array_index(message->workspaces, i);
 
-        int state = workspace_state(*m);
-        if (state < 0) {
-            problem = "unknown workspace state marker";
-            goto skip_workspace;
-        }
-        m++;
-
-        char *id_start = m;
-        long workspace_id = strtol(m, &m, 0);
-
-        if (m == id_start || *m != ':' || workspace_id == 0) {
-            problem = "workspace name is not a non-zero number";
-            goto skip_workspace;
-        }
-        m++;
-
-        box = gtk_hbox_new(FALSE,2);
+        GtkWidget *box = gtk_hbox_new(FALSE,2);
         gtk_container_add(GTK_CONTAINER(container), box);
 
         char str[24];
-        snprintf(str, sizeof(str), "%ld:", workspace_id);
+        snprintf(str, sizeof(str), "%ld:", ws->id);
         GtkWidget *label = text_label(str, bold_numbers);
         GdkColor color;
-        if (workspace_color(container, state, &color))
+        if (workspace_color(container, workspace_state(ws->marker), &color))
             gtk_widget_modify_fg(GTK_WIDGET(label), GTK_STATE_NORMAL, &color);
         gtk_container_add(GTK_CONTAINER(box), label);
 
-        while (*m != 0) {
-            long xid = strtol(m, &m, 0);
-
-            if (xid != 0) {
-                GtkWidget *icon = get_icon(xid);
-                GtkWidget *eventbox = gtk_event_box_new();
-                gtk_event_box_set_visible_window(GTK_EVENT_BOX(eventbox), FALSE);
-                gtk_container_add(GTK_CONTAINER(eventbox), icon);
-                gtk_container_add(GTK_CONTAINER(box), eventbox);
-                g_signal_connect(G_OBJECT(eventbox), "button_press_event", G_CALLBACK(icon_click), GSIZE_TO_POINTER(xid));
-            }
-
-            if (*m == ';') {
-                m++;
-                break;
-            }
-            if (*m != ',') {
-                if (*m != 0) {
-                    problem = "malformed window list";
-                    goto skip_workspace;
-                }
-                break;
-            }
-            m++;
+        for (guint j = 0; j < ws->windows->len; j++) {
+            long xid = g_array_index(ws->windows, long, j);
+            GtkWidget *icon = get_icon(xid);
+            GtkWidget *eventbox = gtk_event_box_new();
+            gtk_event_box_set_visible_window(GTK_EVENT_BOX(eventbox), FALSE);
+            gtk_container_add(GTK_CONTAINER(eventbox), icon);
+            gtk_container_add(GTK_CONTAINER(box), eventbox);
+            g_signal_connect(G_OBJECT(eventbox), "button_press_event", G_CALLBACK(icon_click), GSIZE_TO_POINTER(xid));
         }
-        continue;
-
-    skip_workspace:
-        // Drop what was built of the offending workspace and report it, then
-        // continue after it. The list ends with ';' before the title's '|'.
-        if (box != NULL)
-            gtk_widget_destroy(box);
-        m = ws_start;
-        while (*m != 0 && *m != ';' && *m != '|')
-            m++;
-        g_string_append_printf(problems, "%s%s: \"%.*s\"",
-                               problems->len > 0 ? "; " : "", problem,
-                               (int)(m - ws_start), ws_start);
-        if (*m == ';')
-            m++;
     }
 
     // Report problems, but only when they change, to avoid flooding the log
     // with the same complaint on every update
+    const char *problems = message->problems;
     const char *last_problems = g_object_get_data(G_OBJECT(container), "last-problems");
-    if (g_strcmp0(problems->str, last_problems ? last_problems : "") != 0) {
-        if (problems->len > 0)
+    if (g_strcmp0(problems, last_problems ? last_problems : "") != 0) {
+        if (problems[0] != 0)
             g_warning("Ignoring malformed workspaces in message from xmonad (%s). "
-                      "See xmonad.hs for the expected format.", problems->str);
+                      "See xmonad.hs for the expected format.", problems);
         g_object_set_data_full(G_OBJECT(container), "last-problems",
-                               g_string_free(problems, FALSE), g_free);
-    } else {
-        g_string_free(problems, TRUE);
+                               g_strdup(problems), g_free);
     }
 
     // Window title. A title longer than the limit is shortened with "...",
     // keeping the limit's width: an ellipsized label may otherwise shrink to
     // just the "...". A limited title doesn't expand into free space either.
-    GtkWidget *label = text_label(m, bold_title);
+    const char *title = message->title;
+    GtkWidget *label = text_label(title, bold_title);
     if (title_max_width > 0) {
-        if (g_utf8_strlen(m, -1) > title_max_width) {
+        if (g_utf8_strlen(title, -1) > title_max_width) {
             gtk_label_set_ellipsize(GTK_LABEL(label), PANGO_ELLIPSIZE_END);
             gtk_label_set_width_chars(GTK_LABEL(label), title_max_width);
             gtk_label_set_max_width_chars(GTK_LABEL(label), title_max_width);
@@ -428,6 +387,8 @@ static void signal_handler(DBusGProxy *obj, const char *msg, GtkWidget *containe
     } else {
         gtk_container_add(GTK_CONTAINER(container), label);
     }
+
+    xla_message_free(message);
 
     gtk_widget_show_all(container);
 }

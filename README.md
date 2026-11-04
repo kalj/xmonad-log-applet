@@ -66,6 +66,8 @@ versions of Gnome 3 with libpanelapplet-4.0.
 If you are compiling from a git clone, you should run `./autogen.sh` instead of
 `./configure`.
 
+`make check` runs the unit tests for the parsing of xmonad's messages.
+
 ## FAQ
 
 *   Which Haskell D-Bus package should I use?

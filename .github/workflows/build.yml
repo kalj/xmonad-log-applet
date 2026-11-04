@@ -1,0 +1,36 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  mate:
+    name: MATE applet
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        # The Build-Depends in debian/control, minus the packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            autoconf automake libtool intltool pkg-config \
+            libglib2.0-dev libxcb1-dev libxcb-ewmh-dev \
+            libdbus-glib-1-dev libmate-panel-applet-dev
+
+      - name: Configure
+        # Fail on new warnings. GTK deprecation warnings are left out: the
+        # applet still uses GTK 2 era APIs, and MATE's applet menu needs
+        # GtkActionGroup.
+        run: ./autogen.sh --with-panel=mate CFLAGS="-O2 -Wall -Werror -Wno-deprecated-declarations"
+
+      - name: Build
+        run: make -j"$(nproc)"
+
+      - name: Test
+        run: make check VERBOSE=1

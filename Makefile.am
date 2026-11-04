@@ -8,7 +8,7 @@ xmonad_log_applet_LTLIBRARIES = libxmonad-log-applet.la
 PLUGIN_FILE = libxmonad-log-applet.la
 IN_PROC_STR = "InProcess=true"
 
-libxmonad_log_applet_la_SOURCES = main.c
+libxmonad_log_applet_la_SOURCES = main.c parser.c parser.h
 libxmonad_log_applet_la_CPPFLAGS = \
 	$(GLIB_CFLAGS) \
 	$(DBUS_GLIB_CFLAGS) \
@@ -33,7 +33,7 @@ plugin_PROGRAMS = xmonad-log-applet
 PLUGIN_DIR_ = $(PLUGIN_DIR)
 PLUGIN_FILE = xmonad-log-applet
 
-xmonad_log_applet_SOURCES = main.c
+xmonad_log_applet_SOURCES = main.c parser.c parser.h
 xmonad_log_applet_CPPFLAGS = \
 	$(GLIB_CFLAGS) \
 	$(DBUS_GLIB_CFLAGS) \
@@ -47,6 +47,13 @@ xmonad_log_applet_LDADD = \
 	$(XCB_LIBS)
 
 endif
+
+# Unit tests, run by "make check". They only need GLib.
+check_PROGRAMS = tests/test-parser
+tests_test_parser_SOURCES = tests/test-parser.c parser.c parser.h
+tests_test_parser_CPPFLAGS = $(GLIB_CFLAGS)
+tests_test_parser_LDADD = $(GLIB_LIBS)
+TESTS = $(check_PROGRAMS)
 
 appletdir = $(LIBPANEL_APPLET_DIR)
 if PANEL_GNOME
