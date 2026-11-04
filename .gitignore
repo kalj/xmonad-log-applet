@@ -25,3 +25,8 @@ libtool
 libxmonad-log-applet.la
 libxmonad_log_applet_la-main.lo
 ltmain.sh
+*.log
+*.trs
+tests/test-parser
+test-driver
+.dirstamp
