@@ -34,14 +34,20 @@ import qualified XMonad.StackSet as S
 main :: IO ()
 main = do
   dbus <- D.connectSession
-  _ <- D.requestName dbus (D.busName_ "org.xmonad.Log")
-         [D.nameAllowReplacement, D.nameReplaceExisting, D.nameDoNotQueue]
+  getWellKnownName dbus
   -- mateConfig already includes the EWMH hooks, so keep its logHook and
   -- run ours after it. The urgency hook lets the log see urgent windows,
   -- for the applet's urgent workspace colour.
   xmonad $ withUrgencyHook NoUrgencyHook $ ewmhFullscreen mateConfig {
     logHook = logHook mateConfig >> dynamicLogWithPP (appletPP dbus)
   }
+
+-- Take the bus name the applet listens to
+getWellKnownName :: D.Client -> IO ()
+getWellKnownName dbus = do
+  _ <- D.requestName dbus (D.busName_ "org.xmonad.Log")
+                [D.nameAllowReplacement, D.nameReplaceExisting, D.nameDoNotQueue]
+  return ()
 
 -- The applet's message format: each workspace as its state marker, name and
 -- window ids ("*1:1234,5678"), separated by ';', then '|' and the title of
