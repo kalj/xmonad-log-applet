@@ -53,9 +53,11 @@ There are two pieces of setup you'll need to get this working, assuming you are
 already running Xmonad within [GNOME][1], MATE or [Xfce][2]:
 
 * An xmonad.hs setup file that will send properly-formatted information to
-  D-Bus. You can use [this xmonad.hs][3] as an example. It needs xmonad and
-  xmonad-contrib 0.17 or later, and the Haskell [dbus][5] and utf8-string
-  packages.
+  D-Bus. You can use [this xmonad.hs][3] as an example. It is set up for
+  xmonad in a MATE session, and its comments explain how to make MATE use
+  xmonad as its window manager and how to adapt it to other desktops. It needs
+  xmonad and xmonad-contrib 0.17 or later, and the Haskell [dbus][5] and
+  utf8-string packages.
 
 * The panel applet. Pull the latest version from the git repository: `git clone
   https://github.com/kalj/xmonad-log-applet.git`
