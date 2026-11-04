@@ -34,8 +34,15 @@ typedef struct {
 // Parse a message. Workspaces whose marker isn't in markers, whose number
 // isn't a non-zero number, or whose window list is malformed are left out
 // and described in problems; the rest of the message is still parsed.
+//
+// Never returns NULL. The result is newly allocated and owned by the caller,
+// who must free it with xla_message_free. It holds its own copies of
+// everything, so msg and markers may be freed while it is still in use.
 XlaMessage *xla_message_parse(const char *msg, const char *markers);
 
+// Free a message from xla_message_parse, including its workspaces, their
+// window arrays, the title and the problems. Does nothing if message is
+// NULL.
 void xla_message_free(XlaMessage *message);
 
 #endif
