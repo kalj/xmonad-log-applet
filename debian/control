@@ -7,7 +7,6 @@ Build-Depends:
  autoconf,
  automake,
  libtool,
- intltool,
  pkg-config,
  libglib2.0-dev,
  libxcb1-dev,
