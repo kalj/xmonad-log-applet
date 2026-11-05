@@ -22,9 +22,10 @@ This fork includes all of that and adds:
 * **Window icons and colours**, from [hamax's fork](https://github.com/hamax/xmonad-log-applet):
   icons, click-to-activate, and separate colours for current, visible, hidden
   and urgent workspaces.
-* **Preferences dialog (MATE only):** right-click the applet to set expand to
-  fill panel, workspace colours, bold text and a maximum title width. Settings
-  are stored per applet with GSettings.
+* **Preferences dialog (MATE and Xfce):** set expand to fill panel, workspace
+  colours, bold text and a maximum title width. Open it with Preferences
+  (MATE) or Properties (Xfce) in the applet's right-click menu. Settings are
+  stored per applet with GSettings.
 * **GNOME panel fixes:** in-process applet support for libpanel-applet >= 3.22,
   from [u-quark](https://github.com/u-quark/xmonad-log-applet).
 * **Debian packaging** for the MATE applet (see `debian/`).
