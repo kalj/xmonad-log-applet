@@ -1,3 +1,24 @@
+xmonad-log-applet (2.90.0-1) unstable; urgency=medium
+
+  * New upstream version 2.90.0, a preview of 3.0. Only the MATE panel is
+    supported for now.
+  * Icons: only a left click activates a window, so a right click reaches
+    the panel menu. Windows without an icon get a generic one instead of
+    being left out.
+  * A failed X connection no longer crashes the applet, and all applets in
+    a process share one X connection.
+  * A malformed workspace in a message from xmonad is skipped and logged,
+    instead of blanking the applet.
+  * Use GDBus instead of the deprecated dbus-glib. The subscription is
+    removed when the applet is destroyed.
+  * Drop libdbus-glib-1-dev and intltool from Build-Depends.
+  * Run the new unit tests for the message parser during the build.
+  * Sample xmonad.hs: based on mateConfig, marks urgent workspaces and
+    formats its messages with dynamicLogWithPP. It needs xmonad-contrib
+    0.17 or later.
+
+ -- Karl Ljungkvist <dev@kalj.se>  Thu, 05 Nov 2026 14:20:10 +0100
+
 xmonad-log-applet (2.1.0-1) unstable; urgency=medium
 
   * Initial Debian package of the MATE XMonad log applet.
