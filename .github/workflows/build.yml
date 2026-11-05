@@ -9,32 +9,49 @@ permissions:
   contents: read
 
 jobs:
-  mate:
-    name: MATE applet
+  applet:
+    name: ${{ matrix.name }}
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: MATE applet
+            panel: mate
+            panel-dev: libmate-panel-applet-dev
+          - name: Xfce plugin
+            panel: xfce4
+            panel-dev: libxfce4panel-2.0-dev
     steps:
       - uses: actions/checkout@v4
 
       - name: Install build dependencies
-        # The Build-Depends in debian/control, minus the packaging tools
+        # For MATE, the Build-Depends in debian/control minus the packaging
+        # tools; the other panels use their own development package
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             autoconf automake libtool pkg-config \
             libglib2.0-dev libxcb1-dev libxcb-ewmh-dev \
-            libmate-panel-applet-dev
+            ${{ matrix.panel-dev }}
 
       - name: Configure
         # Fail on new warnings. GTK deprecation warnings are left out: the
         # applet still uses GTK 2 era APIs, and MATE's applet menu needs
         # GtkActionGroup.
-        run: ./autogen.sh --with-panel=mate CFLAGS="-O2 -Wall -Werror -Wno-deprecated-declarations"
+        run: ./autogen.sh --with-panel=${{ matrix.panel }} CFLAGS="-O2 -Wall -Werror -Wno-deprecated-declarations"
 
       - name: Build
         run: make -j"$(nproc)"
 
       - name: Test
         run: make check VERBOSE=1
+
+      - name: Install
+        # Into a staging directory, to check what gets installed where
+        run: |
+          make install DESTDIR="$RUNNER_TEMP/root"
+          find "$RUNNER_TEMP/root" -type f | sort
 
   debian-package:
     name: Debian package

@@ -32,7 +32,7 @@
 #include <mate-panel-applet-gsettings.h>
 #endif
 #ifdef PANEL_XFCE4
-#include <libxfce4panel/xfce-panel-plugin.h>
+#include <libxfce4panel/libxfce4panel.h>
 #endif
 
 // Misc
@@ -434,7 +434,8 @@ static void set_up_dbus_transfer(GtkWidget *container)
     if (connection == NULL) {
         g_printerr("Failed to open connection: %s\n", error->message);
         g_error_free(error);
-        #ifdef PANEL_GNOME_IN_PROC
+        #if defined(PANEL_GNOME_IN_PROC) || defined(PANEL_XFCE4)
+        // A module can't exit: that would take down the process loading it
         return;
         #else
         exit(-1);
@@ -839,6 +840,5 @@ MATE_PANEL_APPLET_OUT_PROCESS_FACTORY(
     NULL);
 #endif
 #ifdef PANEL_XFCE4
-XFCE_PANEL_PLUGIN_REGISTER_EXTERNAL(
-    xmonad_log_applet_construct);
+XFCE_PANEL_PLUGIN_REGISTER(xmonad_log_applet_construct);
 #endif
