@@ -25,7 +25,8 @@
 #define XMONAD_LOG_APPLET_SCHEMA "org.mate.panel.applet.xmonad-log"
 
 #ifdef PANEL_GNOME
-#include <panel-applet.h>
+#include <libgnome-panel/gp-applet.h>
+#include <libgnome-panel/gp-module.h>
 #endif
 #ifdef PANEL_MATE
 #include <mate-panel-applet.h>
@@ -434,7 +435,7 @@ static void set_up_dbus_transfer(GtkWidget *container)
     if (connection == NULL) {
         g_printerr("Failed to open connection: %s\n", error->message);
         g_error_free(error);
-        #if defined(PANEL_GNOME_IN_PROC) || defined(PANEL_XFCE4)
+        #if defined(PANEL_GNOME) || defined(PANEL_XFCE4)
         // A module can't exit: that would take down the process loading it
         return;
         #else
@@ -717,7 +718,7 @@ static void set_up_settings_and_menu(MatePanelApplet *applet, GtkWidget *contain
 #endif
 
 #ifdef PANEL_GNOME
-static gboolean xmonad_log_applet_fill(PanelApplet *applet)
+static gboolean xmonad_log_applet_fill(GpApplet *applet)
 #endif
 #ifdef PANEL_MATE
 static gboolean xmonad_log_applet_fill(MatePanelApplet *applet)
@@ -727,15 +728,11 @@ static void xmonad_log_applet_fill(GtkContainer *container)
 #endif
 {
 #ifdef PANEL_GNOME
-    panel_applet_set_flags(
+    gp_applet_set_flags(
         applet,
-        PANEL_APPLET_EXPAND_MAJOR |
-        PANEL_APPLET_EXPAND_MINOR |
-        PANEL_APPLET_HAS_HANDLE);
-
-    #ifndef PANEL_GNOME_IN_PROC
-    panel_applet_set_background_widget(applet, GTK_WIDGET(applet));
-    #endif
+        GP_APPLET_FLAGS_EXPAND_MAJOR |
+        GP_APPLET_FLAGS_EXPAND_MINOR |
+        GP_APPLET_FLAGS_HAS_HANDLE);
 #endif
 #ifdef PANEL_MATE
     // EXPAND_MAJOR is controlled by the "expand" setting
@@ -766,27 +763,6 @@ static void xmonad_log_applet_fill(GtkContainer *container)
 #endif
 }
 
-#ifdef PANEL_GNOME
-static gboolean xmonad_log_applet_factory(
-    PanelApplet *applet, const gchar *iid, gpointer data)
-{
-    gboolean retval = FALSE;
-
-    if(!strcmp(iid, "XmonadLogApplet"))
-        retval = xmonad_log_applet_fill(applet);
-
-    if(retval == FALSE) {
-        printf("Wrong applet!\n");
-        #ifdef PANEL_GNOME_IN_PROC
-        return FALSE;
-        #else
-        exit(-1);
-        #endif
-    }
-
-    return retval;
-}
-#endif
 #ifdef PANEL_MATE
 static gboolean xmonad_log_applet_factory(
     MatePanelApplet *applet, const gchar *iid, gpointer data)
@@ -798,11 +774,7 @@ static gboolean xmonad_log_applet_factory(
 
     if(retval == FALSE) {
         printf("Wrong applet!\n");
-        #ifdef PANEL_GNOME_IN_PROC
-        return NULL;
-        #else
         exit(-1);
-        #endif
     }
 
     return retval;
@@ -818,18 +790,60 @@ static void xmonad_log_applet_construct(XfcePanelPlugin *plugin)
 #endif
 
 #ifdef PANEL_GNOME
-#ifdef PANEL_GNOME_IN_PROC
-PANEL_APPLET_IN_PROCESS_FACTORY(
-#else
-PANEL_APPLET_OUT_PROCESS_FACTORY(
-#endif
-    "XmonadLogAppletFactory",
-    PANEL_TYPE_APPLET,
-#ifdef PANEL_GNOME2
-    "XmonadLogApplet",
-#endif
-    xmonad_log_applet_factory,
-    NULL);
+// gnome-panel (3.38 and later) loads applets from modules, in its own
+// process. The applet is a GpApplet subclass, set up when constructed.
+#define XMONAD_LOG_TYPE_APPLET (xmonad_log_applet_get_type())
+G_DECLARE_FINAL_TYPE(XmonadLogApplet, xmonad_log_applet, XMONAD_LOG, APPLET, GpApplet)
+
+struct _XmonadLogApplet {
+    GpApplet parent;
+};
+
+G_DEFINE_TYPE(XmonadLogApplet, xmonad_log_applet, GP_TYPE_APPLET)
+
+static void xmonad_log_applet_constructed(GObject *object)
+{
+    G_OBJECT_CLASS(xmonad_log_applet_parent_class)->constructed(object);
+    xmonad_log_applet_fill(GP_APPLET(object));
+}
+
+static void xmonad_log_applet_class_init(XmonadLogAppletClass *klass)
+{
+    G_OBJECT_CLASS(klass)->constructed = xmonad_log_applet_constructed;
+}
+
+static void xmonad_log_applet_init(XmonadLogApplet *self)
+{
+}
+
+#define APPLET_ID "xmonad-log-applet"
+
+static GpAppletInfo *get_applet_info(const gchar *id)
+{
+    if (g_strcmp0(id, APPLET_ID) != 0)
+        return NULL;
+    return gp_applet_info_new(xmonad_log_applet_get_type, "Xmonad Log Applet",
+                              "Monitor your Xmonad log", "xmonad-log-applet");
+}
+
+// Panels set up with the old libpanel-applet version know the applet by
+// its factory and applet names
+static const gchar *get_applet_id_from_iid(const gchar *iid)
+{
+    if (g_strcmp0(iid, "XmonadLogAppletFactory::XmonadLogApplet") == 0)
+        return APPLET_ID;
+    return NULL;
+}
+
+void gp_module_load(GpModule *module)
+{
+    gp_module_set_abi_version(module, GP_MODULE_ABI_VERSION);
+    gp_module_set_id(module, "org.xmonad.xmonad-log-applet");
+    gp_module_set_version(module, PACKAGE_VERSION);
+    gp_module_set_applet_ids(module, APPLET_ID, NULL);
+    gp_module_set_get_applet_info(module, get_applet_info);
+    gp_module_set_compatibility(module, get_applet_id_from_iid);
+}
 #endif
 #ifdef PANEL_MATE
 MATE_PANEL_APPLET_OUT_PROCESS_FACTORY(

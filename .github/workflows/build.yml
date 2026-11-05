@@ -22,6 +22,9 @@ jobs:
           - name: Xfce plugin
             panel: xfce4
             panel-dev: libxfce4panel-2.0-dev
+          - name: GNOME panel module
+            panel: gnome
+            panel-dev: libgnome-panel-dev
     steps:
       - uses: actions/checkout@v4
 

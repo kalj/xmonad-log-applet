@@ -29,31 +29,21 @@ AC_SUBST([SESSION_BUS_SERVICES_DIR])
 
 AC_ARG_WITH(
     [panel],
-    [AS_HELP_STRING([--with-panel], [target gnome2, gnome3, gnomeflashback, mate or xfce4 (default) panel])],
+    [AS_HELP_STRING([--with-panel], [target gnome, mate or xfce4 (default) panel])],
     [panel=$withval],
     [panel=xfce4]
 )
 AS_IF(
-    [test "x$panel" = xgnome2],
-        [PKG_CHECK_MODULES(LIBPANEL, libpanelapplet-3.0 >= 2.32.0)]
-        LIBPANEL_APPLET_DIR=`$PKG_CONFIG --variable=prefix libpanelapplet-3.0`/share/gnome-panel/applets
-        PLUGIN_DIR=`$PKG_CONFIG --variable=prefix libpanelapplet-3.0`/libexec
+    [test "x$panel" = xgnome -o "x$panel" = xgnomeflashback],
+        dnl gnome-panel 3.38 and later (as used by GNOME Flashback) load
+        dnl applets from modules in its modules directory
+        [PKG_CHECK_MODULES(LIBPANEL, libgnome-panel >= 3.38.0)]
+        PLUGIN_DIR=`$PKG_CONFIG --variable=modulesdir libgnome-panel`
+        panel=gnome
         [AC_DEFINE(PANEL_GNOME, 1, [panel type])]
-        [AC_DEFINE(PANEL_GNOME2, 1, [panel type])]
         ,
-    [test "x$panel" = xgnome3],
-        [PKG_CHECK_MODULES(LIBPANEL, libpanelapplet-4.0 >= 3.0.0)]
-        LIBPANEL_APPLET_DIR=`$PKG_CONFIG --variable=libpanel_applet_dir libpanelapplet-4.0`
-        PLUGIN_DIR=`$PKG_CONFIG --variable=prefix libpanelapplet-4.0`/libexec
-        [AC_DEFINE(PANEL_GNOME, 1, [panel type])]
-        [AC_DEFINE(PANEL_GNOME3, 1, [panel type])]
-        ,
-    [test "x$panel" = xgnomeflashback],
-        [PKG_CHECK_MODULES(LIBPANEL, libpanel-applet >= 3.0.0)]
-        LIBPANEL_APPLET_DIR=`$PKG_CONFIG --variable=libpanel_applet_dir libpanel-applet`
-        PLUGIN_DIR=`$PKG_CONFIG --variable=prefix libpanel-applet`/libexec
-        [AC_DEFINE(PANEL_GNOME, 1, [panel type])]
-        [AC_DEFINE(PANEL_GNOMEFLASHBACK, 1, [panel type])]
+    [test "x$panel" = xgnome2 -o "x$panel" = xgnome3],
+        [AC_MSG_ERROR([--with-panel=$panel is no longer supported: the libpanel-applet library it needs was removed in gnome-panel 3.38. Use --with-panel=gnome for gnome-panel 3.38 or later.])]
         ,
     [test "x$panel" = xmate],
         [PKG_CHECK_MODULES(LIBPANEL, libmatepanelapplet-4.0 >= 1.6.0)]
@@ -69,20 +59,14 @@ AS_IF(
         PLUGIN_DIR=`$PKG_CONFIG --variable=libdir libxfce4panel-2.0`/xfce4/panel/plugins
         [AC_DEFINE(PANEL_XFCE4, 1, [panel type])]
         ,
-    [AC_MSG_ERROR([Unknown panel type, use gnome2, gnome3, gnomeflashback, mate or xfce4])]
+    [AC_MSG_ERROR([Unknown panel type, use gnome, mate or xfce4])]
 )
-PKG_CHECK_MODULES(LIBPANEL_GE_3_22, libpanel-applet >= 3.22.0, PANEL_GNOME_IN_PROC=1, PANEL_GNOME_IN_PROC=0)
 AC_SUBST([LIBPANEL_APPLET_DIR])
 AC_SUBST([PLUGIN_DIR])
 
-AM_CONDITIONAL([PANEL_GNOME], [test "x$panel" = xgnome2 -o "x$panel" = xgnome3 -o "x$panel" = xgnomeflashback])
-AM_CONDITIONAL([PANEL_GNOME2], [test "x$panel" = xgnome2])
-AM_CONDITIONAL([PANEL_GNOME3], [test "x$panel" = xgnome3])
-AM_CONDITIONAL([PANEL_GNOMEFLASHBACK], [test "x$panel" = xgnomeflashback])
+AM_CONDITIONAL([PANEL_GNOME], [test "x$panel" = xgnome])
 AM_CONDITIONAL([PANEL_MATE], [test "x$panel" = xmate])
 AM_CONDITIONAL([PANEL_XFCE4], [test "x$panel" = xxfce4])
-AM_CONDITIONAL([PANEL_GNOME_IN_PROC], [test "$PANEL_GNOME_IN_PROC" -eq 1])
-AS_IF([test "$PANEL_GNOME_IN_PROC" -eq 1], [AC_DEFINE([PANEL_GNOME_IN_PROC], [1], [Define if using libpanel-applet >= 3.22.0 and we need in process applet.])])
 
 # GSettings schema with the appearance settings and their defaults
 GLIB_GSETTINGS
