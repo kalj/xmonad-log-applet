@@ -1,4 +1,4 @@
-AC_INIT([Xmonad Log Applet], [2.1.0])
+AC_INIT([Xmonad Log Applet], [2.90.0])
 AC_CONFIG_SRCDIR([main.c])
 AC_CONFIG_HEADERS([config.h])
 AM_INIT_AUTOMAKE([foreign subdir-objects])
