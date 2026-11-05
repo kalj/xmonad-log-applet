@@ -19,8 +19,12 @@ PKG_PROG_PKG_CONFIG
 PKG_CHECK_MODULES(GLIB, glib-2.0 >= 2.40.0)
 PKG_CHECK_MODULES(XCB, xcb xcb-ewmh)
 
-PKG_CHECK_MODULES(DBUS_GLIB, dbus-glib-1 >= 0.80)
-SESSION_BUS_SERVICES_DIR=`$PKG_CONFIG --variable=session_bus_services_dir dbus-1`
+PKG_CHECK_MODULES(GIO, gio-2.0 >= 2.40.0)
+
+# Where the D-Bus service file for the applet factory goes. Ask D-Bus if its
+# development files are installed, otherwise use the standard location.
+PKG_CHECK_VAR([SESSION_BUS_SERVICES_DIR], [dbus-1], [session_bus_services_dir], [],
+              [SESSION_BUS_SERVICES_DIR='${datadir}/dbus-1/services'])
 AC_SUBST([SESSION_BUS_SERVICES_DIR])
 
 AC_ARG_WITH(

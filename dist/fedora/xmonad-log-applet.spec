@@ -9,8 +9,8 @@ URL:		http://uhsure.com/xmonad-log-applet.html
 Source0:	xmonad-log-applet.tar.gz
 BuildRoot:	%(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
-BuildRequires:	coreutils,gcc,sed,pkgconfig,glib2-devel,dbus-glib-devel,gnome-panel-devel
-Requires:	glib2,dbus-glib,gnome-panel
+BuildRequires:	coreutils,gcc,sed,pkgconfig,glib2-devel,gnome-panel-devel
+Requires:	glib2,gnome-panel
 
 %description
 
