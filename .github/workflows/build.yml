@@ -20,7 +20,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            autoconf automake libtool intltool pkg-config \
+            autoconf automake libtool pkg-config \
             libglib2.0-dev libxcb1-dev libxcb-ewmh-dev \
             libmate-panel-applet-dev
 
@@ -35,3 +35,47 @@ jobs:
 
       - name: Test
         run: make check VERBOSE=1
+
+  debian-package:
+    name: Debian package
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        # The packaging tools, then the Build-Depends from debian/control
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends dpkg-dev debhelper
+          sudo apt-get build-dep -y ./
+
+      - name: Build package
+        # Also runs the unit tests (dh_auto_test runs make check)
+        run: dpkg-buildpackage -us -uc -b
+
+      - name: Collect package
+        # dpkg-buildpackage writes to the parent directory
+        run: mkdir debs && mv ../*.deb debs/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xmonad-log-applet-deb
+          path: debs/*.deb
+
+  xmonad-config:
+    name: Sample xmonad.hs
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install GHC and the Haskell libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ghc libghc-xmonad-contrib-dev libghc-dbus-dev
+
+      - name: Type-check xmonad.hs
+        # Fail on warnings, including deprecations. /usr/bin/ghc is Ubuntu's
+        # GHC, which knows about the packages above; a GHC installed some
+        # other way may come first on the PATH.
+        run: /usr/bin/ghc -Wall -Werror -fno-code -outputdir "$RUNNER_TEMP/ghc" xmonad.hs
