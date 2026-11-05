@@ -12,6 +12,10 @@ jobs:
   applet:
     name: ${{ matrix.name }}
     runs-on: ubuntu-24.04
+    # Fail a job whose package downloads hang, instead of leaving the PR
+    # pending for GitHub's default of six hours. The slowest normal run so
+    # far took about 10 minutes.
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -56,6 +60,7 @@ jobs:
   debian-package:
     name: Debian package
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -82,6 +87,7 @@ jobs:
   xmonad-config:
     name: Sample xmonad.hs
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
