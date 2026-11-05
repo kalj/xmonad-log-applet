@@ -22,7 +22,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             autoconf automake libtool pkg-config \
             libglib2.0-dev libxcb1-dev libxcb-ewmh-dev \
-            libdbus-glib-1-dev libmate-panel-applet-dev
+            libmate-panel-applet-dev
 
       - name: Configure
         # Fail on new warnings. GTK deprecation warnings are left out: the

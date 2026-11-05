@@ -11,7 +11,6 @@ Build-Depends:
  libglib2.0-dev,
  libxcb1-dev,
  libxcb-ewmh-dev,
- libdbus-glib-1-dev,
  libmate-panel-applet-dev
 Standards-Version: 4.7.0
 Homepage: https://github.com/kalj/xmonad-log-applet

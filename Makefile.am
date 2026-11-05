@@ -11,13 +11,13 @@ IN_PROC_STR = "InProcess=true"
 libxmonad_log_applet_la_SOURCES = main.c parser.c parser.h
 libxmonad_log_applet_la_CPPFLAGS = \
 	$(GLIB_CFLAGS) \
-	$(DBUS_GLIB_CFLAGS) \
+	$(GIO_CFLAGS) \
 	$(LIBPANEL_CFLAGS) \
 	$(XCB_CFLAGS)
 
 libxmonad_log_applet_la_LIBADD = \
 	$(GLIB_LIBS) \
-	$(DBUS_GLIB_LIBS) \
+	$(GIO_LIBS) \
 	$(LIBPANEL_LIBS) \
 	$(XCB_LIBS)
 
@@ -36,13 +36,13 @@ PLUGIN_FILE = xmonad-log-applet
 xmonad_log_applet_SOURCES = main.c parser.c parser.h
 xmonad_log_applet_CPPFLAGS = \
 	$(GLIB_CFLAGS) \
-	$(DBUS_GLIB_CFLAGS) \
+	$(GIO_CFLAGS) \
 	$(LIBPANEL_CFLAGS) \
 	$(XCB_CFLAGS)
 
 xmonad_log_applet_LDADD = \
 	$(GLIB_LIBS) \
-	$(DBUS_GLIB_LIBS) \
+	$(GIO_LIBS) \
 	$(LIBPANEL_LIBS) \
 	$(XCB_LIBS)
 

@@ -14,9 +14,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <gio/gio.h>
 #include <gtk/gtk.h>
-#include <dbus/dbus-glib.h>
-#include <dbus/dbus.h>
 #include <xcb/xcb_ewmh.h>
 
 #include "parser.h"
@@ -309,8 +308,8 @@ static GtkWidget *text_label(const char *text, gboolean bold)
     return label;
 }
 
-// DBUS
-static void signal_handler(DBusGProxy *obj, const char *msg, GtkWidget *container)
+// Show a message from xmonad
+static void signal_handler(const char *msg, GtkWidget *container)
 {
     // Remember the message, so it can be redrawn when the appearance changes
     if (msg != g_object_get_data(G_OBJECT(container), "last-msg")) {
@@ -393,14 +392,46 @@ static void signal_handler(DBusGProxy *obj, const char *msg, GtkWidget *containe
     gtk_widget_show_all(container);
 }
 
-static void set_up_dbus_transfer(GtkWidget *buf)
+// DBUS
+// An "Update" signal from xmonad.hs, carrying the message as a string
+static void on_update(GDBusConnection *connection, const gchar *sender,
+                      const gchar *object_path, const gchar *interface_name,
+                      const gchar *signal_name, GVariant *parameters,
+                      gpointer container)
 {
-    DBusGConnection *connection;
-    DBusGProxy *proxy;
-    GError *error= NULL;
+    if (!g_variant_is_of_type(parameters, G_VARIANT_TYPE("(s)"))) {
+        g_warning("Ignoring an Update signal from xmonad with arguments of type %s",
+                  g_variant_get_type_string(parameters));
+        return;
+    }
 
-    connection = dbus_g_bus_get(DBUS_BUS_SESSION, &error);
-    if(connection == NULL) {
+    const gchar *msg;
+    g_variant_get(parameters, "(&s)", &msg);
+    signal_handler(msg, GTK_WIDGET(container));
+}
+
+typedef struct {
+    GDBusConnection *connection;
+    guint id;
+} Subscription;
+
+// Stop listening when the container goes away, so that no message is
+// shown in a destroyed container
+static void unsubscribe(GtkWidget *container, gpointer data)
+{
+    Subscription *subscription = data;
+    g_dbus_connection_signal_unsubscribe(subscription->connection, subscription->id);
+    g_object_unref(subscription->connection);
+    g_free(subscription);
+}
+
+// Show xmonad's messages in container. Only signals sent by the owner of the
+// name org.xmonad.Log, which xmonad.hs takes, are accepted.
+static void set_up_dbus_transfer(GtkWidget *container)
+{
+    GError *error = NULL;
+    GDBusConnection *connection = g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, &error);
+    if (connection == NULL) {
         g_printerr("Failed to open connection: %s\n", error->message);
         g_error_free(error);
         #ifdef PANEL_GNOME_IN_PROC
@@ -410,13 +441,12 @@ static void set_up_dbus_transfer(GtkWidget *buf)
         #endif
     }
 
-    proxy = dbus_g_proxy_new_for_name(
-        connection, "org.xmonad.Log", "/org/xmonad/Log", "org.xmonad.Log");
-    error = NULL;
-
-    dbus_g_proxy_add_signal(proxy, "Update", G_TYPE_STRING, G_TYPE_INVALID);
-    dbus_g_proxy_connect_signal(
-        proxy, "Update", (GCallback)signal_handler, buf, NULL);
+    Subscription *subscription = g_new(Subscription, 1);
+    subscription->connection = connection;
+    subscription->id = g_dbus_connection_signal_subscribe(
+        connection, "org.xmonad.Log", "org.xmonad.Log", "Update", "/org/xmonad/Log",
+        NULL, G_DBUS_SIGNAL_FLAGS_NONE, on_update, container, NULL);
+    g_signal_connect(container, "destroy", G_CALLBACK(unsubscribe), subscription);
 }
 
 #ifdef PANEL_MATE
@@ -453,7 +483,7 @@ static void redraw_workspaces(GSettings *settings, const gchar *key, gpointer co
 
     const char *msg = g_object_get_data(G_OBJECT(container), "last-msg");
     if (msg != NULL)
-        signal_handler(NULL, msg, GTK_WIDGET(container));
+        signal_handler(msg, GTK_WIDGET(container));
 }
 
 // Colours are stored as strings ("red", "#3465a4", ...) and shown as GdkColor
