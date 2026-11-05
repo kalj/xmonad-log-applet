@@ -35,8 +35,8 @@ shows little more than the window title. Use the [`xmonad.hs`](xmonad.hs) in
 this repository as your starting point. Workspace names must be non-zero
 numbers; other workspaces are left out, with a warning in the panel's log.
 
-**Version 2.90 is a preview of 3.0.** Only the MATE panel is supported for now:
-the GNOME and Xfce builds are currently broken.
+**Version 2.90 is a preview of 3.0.** The MATE panel and Xfce panel 4.14 or
+later are supported; the GNOME builds are currently broken.
 
 Please report problems on [this fork's issue tracker](https://github.com/kalj/xmonad-log-applet/issues).
 

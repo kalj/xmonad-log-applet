@@ -1,12 +1,23 @@
 plugindir = $(PLUGIN_DIR)
 
+# The applet is a module loaded by the panel for GNOME's in-process applets
+# and Xfce, otherwise a program the panel starts
 if PANEL_GNOME_IN_PROC
-
 xmonad_log_appletdir = $(libdir)/gnome-panel/modules
 PLUGIN_DIR_ = $(libdir)/gnome-panel/modules
 xmonad_log_applet_LTLIBRARIES = libxmonad-log-applet.la
 PLUGIN_FILE = libxmonad-log-applet.la
 IN_PROC_STR = "InProcess=true"
+else
+if PANEL_XFCE4
+xmonad_log_appletdir = $(PLUGIN_DIR)
+xmonad_log_applet_LTLIBRARIES = libxmonad-log-applet.la
+else
+plugin_PROGRAMS = xmonad-log-applet
+PLUGIN_DIR_ = $(PLUGIN_DIR)
+PLUGIN_FILE = xmonad-log-applet
+endif
+endif
 
 libxmonad_log_applet_la_SOURCES = main.c parser.c parser.h
 libxmonad_log_applet_la_CPPFLAGS = \
@@ -27,12 +38,6 @@ libxmonad_log_applet_la_LDFLAGS = \
 	$(AM_LDFLAGS) \
 	$(XCB_LDFLAGS)
 
-else
-
-plugin_PROGRAMS = xmonad-log-applet
-PLUGIN_DIR_ = $(PLUGIN_DIR)
-PLUGIN_FILE = xmonad-log-applet
-
 xmonad_log_applet_SOURCES = main.c parser.c parser.h
 xmonad_log_applet_CPPFLAGS = \
 	$(GLIB_CFLAGS) \
@@ -45,8 +50,6 @@ xmonad_log_applet_LDADD = \
 	$(GIO_LIBS) \
 	$(LIBPANEL_LIBS) \
 	$(XCB_LIBS)
-
-endif
 
 # Unit tests, run by "make check". They only need GLib.
 check_PROGRAMS = tests/test-parser
@@ -73,9 +76,7 @@ endif
 if PANEL_XFCE4
 applet_files = xmonad-log-applet.desktop
 $(applet_files): $(applet_files:.desktop=.desktop.in)
-	$(SED) -e "s|\@PLUGIN_DIR\@|$(PLUGIN_DIR)|" \
-		   -e "s|\@PLUGIN_FILE\@|$(PLUGIN_FILE)|" \
-		   -e "s|\@IN_PROC\@|$(IN_PROC_STR)|" $< > $@
+	cp $< $@
 endif
 
 applet_DATA = $(applet_files)

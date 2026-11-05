@@ -1,8 +1,10 @@
 [Xfce Panel]
 Type=X-XFCE-PanelPlugin
+Encoding=UTF-8
 Name=Xmonad Log Applet
 Comment=Monitor your Xmonad log
 Icon=xmonad-log-applet
-X-XFCE-Exec=@PLUGIN_DIR@/xmonad-log-applet
-X-XFCE-Unique=false
+X-XFCE-Module=xmonad-log-applet
 X-XFCE-Internal=false
+X-XFCE-Unique=false
+X-XFCE-API=2.0
