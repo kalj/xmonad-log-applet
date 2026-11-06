@@ -76,7 +76,7 @@ endif
 
 # Installed for all panels, which read their defaults from it and store each
 # applet's settings with it
-gsettings_SCHEMAS = org.mate.panel.applet.xmonad-log.gschema.xml
+gsettings_SCHEMAS = org.xmonad.log-applet.gschema.xml
 @GSETTINGS_RULES@
 
 DISTCLEANFILES = \
@@ -91,7 +91,7 @@ EXTRA_DIST = \
 	xmonad-log-applet48.png \
 	org.mate.panel.XmonadLogApplet.mate-panel-applet.in \
 	org.mate.panel.applet.XmonadLogAppletFactory.service.in \
-	org.mate.panel.applet.xmonad-log.gschema.xml \
+	org.xmonad.log-applet.gschema.xml \
 	xmonad-log-applet.desktop.in
 
 gtk_update_icon_cache = gtk-update-icon-cache -f -t
