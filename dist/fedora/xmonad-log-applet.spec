@@ -24,7 +24,7 @@ Requires:       mate-panel
 An applet for the MATE panel that shows xmonad's workspaces, the icons of
 the windows on each workspace and the title of the focused window. Clicking
 a window's icon activates that window. xmonad sends the information over
-D-Bus; an example xmonad.hs is included in the documentation.
+D-Bus; an example xmonad configuration is included in the documentation.
 
 %prep
 %autosetup
