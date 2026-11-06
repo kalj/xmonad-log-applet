@@ -1,5 +1,5 @@
 This spec file builds an RPM of the MATE applet from a release tag, like the
-Debian packaging in `debian/`.
+`xmonad-log-applet-mate` package from the Debian packaging in `debian/`.
 
 To build it, download the release tarball and build the package:
 

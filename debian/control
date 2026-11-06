@@ -11,16 +11,77 @@ Build-Depends:
  libglib2.0-dev,
  libxcb1-dev,
  libxcb-ewmh-dev,
- libmate-panel-applet-dev
+ libmate-panel-applet-dev,
+ libxfce4panel-2.0-dev,
+ libgnome-panel-dev
 Standards-Version: 4.7.0
 Homepage: https://github.com/kalj/xmonad-log-applet
 
-Package: xmonad-log-applet
+Package: xmonad-log-applet-common
+Architecture: all
+Multi-Arch: foreign
+Depends:
+ ${misc:Depends}
+Breaks:
+ xmonad-log-applet (<< 2.90.0-2~)
+Replaces:
+ xmonad-log-applet (<< 2.90.0-2~)
+Description: XMonad log applet for desktop panels - common files
+ A panel applet that shows xmonad's workspaces, the icons of the windows
+ on each workspace and the title of the focused window. Clicking a
+ window's icon activates that window. xmonad sends the information over
+ D-Bus; an example xmonad configuration is included.
+ .
+ This package contains the files shared by the MATE, Xfce and GNOME
+ versions: the settings schema, the icon, the documentation and the
+ example xmonad configuration.
+
+Package: xmonad-log-applet-mate
 Architecture: any
 Depends:
  ${shlibs:Depends},
- ${misc:Depends}
-Description: XMonad log applet for MATE panel
- An applet for displaying XMonad log information in the MATE panel.
- It can display the active workspaces, window title, and other
- information supplied by XMonad.
+ ${misc:Depends},
+ xmonad-log-applet-common (= ${source:Version}),
+ mate-panel
+Breaks:
+ xmonad-log-applet (<< 2.90.0-2~)
+Replaces:
+ xmonad-log-applet (<< 2.90.0-2~)
+Description: XMonad log applet for desktop panels - MATE panel applet
+ A panel applet that shows xmonad's workspaces, the icons of the windows
+ on each workspace and the title of the focused window. Clicking a
+ window's icon activates that window. xmonad sends the information over
+ D-Bus; an example xmonad configuration is included.
+ .
+ This package contains the applet for the MATE panel.
+
+Package: xmonad-log-applet-xfce
+Architecture: any
+Depends:
+ ${shlibs:Depends},
+ ${misc:Depends},
+ xmonad-log-applet-common (= ${source:Version}),
+ xfce4-panel
+Description: XMonad log applet for desktop panels - Xfce panel plugin
+ A panel applet that shows xmonad's workspaces, the icons of the windows
+ on each workspace and the title of the focused window. Clicking a
+ window's icon activates that window. xmonad sends the information over
+ D-Bus; an example xmonad configuration is included.
+ .
+ This package contains the plugin for the Xfce panel (4.14 or later).
+
+Package: xmonad-log-applet-gnome
+Architecture: any
+Depends:
+ ${shlibs:Depends},
+ ${misc:Depends},
+ xmonad-log-applet-common (= ${source:Version}),
+ gnome-panel
+Description: XMonad log applet for desktop panels - GNOME panel module
+ A panel applet that shows xmonad's workspaces, the icons of the windows
+ on each workspace and the title of the focused window. Clicking a
+ window's icon activates that window. xmonad sends the information over
+ D-Bus; an example xmonad configuration is included.
+ .
+ This package contains the module for gnome-panel (3.38 or later), as
+ used by GNOME Flashback.

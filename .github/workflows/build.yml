@@ -64,7 +64,7 @@ jobs:
           find "$RUNNER_TEMP/root" -type f | sort
 
   debian-package:
-    name: Debian package
+    name: Debian packages
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -84,13 +84,20 @@ jobs:
         # Also runs the unit tests (dh_auto_test runs make check)
         run: dpkg-buildpackage -us -uc -b
 
-      - name: Collect package
-        # dpkg-buildpackage writes to the parent directory
-        run: mkdir debs && mv ../*.deb debs/
+      - name: Collect packages
+        # dpkg-buildpackage writes to the parent directory. List what went
+        # into each package, to check the split between them.
+        run: |
+          mkdir debs && mv ../*.deb debs/
+          for deb in debs/*.deb; do
+            echo "== $deb"
+            dpkg-deb --field "$deb" Depends
+            dpkg-deb --contents "$deb"
+          done
 
       - uses: actions/upload-artifact@v4
         with:
-          name: xmonad-log-applet-deb
+          name: xmonad-log-applet-debs
           path: debs/*.deb
 
   xmonad-config:

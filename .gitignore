@@ -30,3 +30,13 @@ ltmain.sh
 tests/test-parser
 test-driver
 .dirstamp
+# Debian package builds (dpkg-buildpackage)
+/build-*/
+/debian/.debhelper/
+/debian/autoreconf.*
+/debian/debhelper-build-stamp
+/debian/files
+/debian/tmp/
+/debian/*.debhelper.log
+/debian/*.substvars
+/debian/xmonad-log-applet-*/
