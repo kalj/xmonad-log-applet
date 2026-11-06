@@ -1,5 +1,5 @@
 Name:           xmonad-log-applet
-Version:        2.90.0
+Version:        3.0.0
 Release:        1%{?dist}
 Summary:        MATE panel applet showing xmonad's workspaces, window icons and title
 
@@ -42,7 +42,7 @@ make check
 
 %files
 %license LICENSE
-%doc README.md AUTHORS.md xmonad.hs
+%doc README.md NEWS.md AUTHORS.md xmonad.hs
 %{_libexecdir}/%{name}
 %{_datadir}/mate-panel/applets/org.mate.panel.XmonadLogApplet.mate-panel-applet
 %{_datadir}/dbus-1/services/org.mate.panel.applet.XmonadLogAppletFactory.service
@@ -50,6 +50,10 @@ make check
 %{_datadir}/icons/hicolor/48x48/apps/%{name}.png
 
 %changelog
+* Fri Nov 06 2026 Karl Ljungkvist <dev@kalj.se> - 3.0.0-1
+- Update to 3.0.0
+- Rename the settings schema to org.xmonad.log-applet
+
 * Fri Nov 06 2026 Karl Ljungkvist <dev@kalj.se> - 2.90.0-1
 - Update to 2.90.0 and package the MATE applet instead of the GNOME 2 one
 - Modernise the spec file

@@ -1,4 +1,4 @@
-AC_INIT([Xmonad Log Applet], [2.90.0])
+AC_INIT([Xmonad Log Applet], [3.0.0])
 AC_CONFIG_SRCDIR([main.c])
 AC_CONFIG_HEADERS([config.h])
 AM_INIT_AUTOMAKE([foreign subdir-objects])
@@ -29,9 +29,9 @@ AC_SUBST([SESSION_BUS_SERVICES_DIR])
 
 AC_ARG_WITH(
     [panel],
-    [AS_HELP_STRING([--with-panel], [target gnome, mate or xfce4 (default) panel])],
+    [AS_HELP_STRING([--with-panel], [target mate (default), xfce4 or gnome panel])],
     [panel=$withval],
-    [panel=xfce4]
+    [panel=mate]
 )
 AS_IF(
     [test "x$panel" = xgnome -o "x$panel" = xgnomeflashback],

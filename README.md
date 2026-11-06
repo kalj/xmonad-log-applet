@@ -38,7 +38,7 @@ shows little more than the window title. Use the [`xmonad.hs`](xmonad.hs) in
 this repository as your starting point. Workspace names must be non-zero
 numbers; other workspaces are left out, with a warning in the panel's log.
 
-**Version 2.90 is a preview of 3.0.**
+See [NEWS.md](NEWS.md) for the changes in each release.
 
 Please report problems on [this fork's issue tracker](https://github.com/kalj/xmonad-log-applet/issues).
 
@@ -68,7 +68,7 @@ already running Xmonad within [GNOME][1], MATE or [Xfce][2]:
 
 The applet supports the MATE panel, gnome-panel 3.38 or later (as used by GNOME
 Flashback) and Xfce panel 4.14 or later. Pass `--with-panel=X` to `./configure`
-when compiling, where X is one of mate, gnome or xfce4 (the default). The GNOME
+when compiling, where X is one of mate (the default), xfce4 or gnome. The GNOME
 2 and older GNOME 3 panels are no longer supported.
 
 If you are compiling from a git clone, you should run `./autogen.sh` instead of
