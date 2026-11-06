@@ -12,6 +12,10 @@ jobs:
   applet:
     name: ${{ matrix.name }}
     runs-on: ubuntu-24.04
+    # Fail a job whose package downloads hang, instead of leaving the PR
+    # pending for GitHub's default of six hours. The slowest normal run so
+    # far took about 10 minutes.
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -32,6 +36,9 @@ jobs:
         # For MATE, the Build-Depends in debian/control minus the packaging
         # tools; the other panels use their own development package
         run: |
+          # Give up on a stalled download after 20 seconds without data and
+          # retry it, instead of hanging until the job times out
+          printf 'Acquire::http::Timeout "20";\nAcquire::https::Timeout "20";\nAcquire::Retries "3";\n' | sudo tee /etc/apt/apt.conf.d/99ci-network
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             autoconf automake libtool pkg-config \
@@ -59,12 +66,16 @@ jobs:
   debian-package:
     name: Debian package
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
       - name: Install build dependencies
         # The packaging tools, then the Build-Depends from debian/control
         run: |
+          # Give up on a stalled download after 20 seconds without data and
+          # retry it, instead of hanging until the job times out
+          printf 'Acquire::http::Timeout "20";\nAcquire::https::Timeout "20";\nAcquire::Retries "3";\n' | sudo tee /etc/apt/apt.conf.d/99ci-network
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends dpkg-dev debhelper
           sudo apt-get build-dep -y ./
@@ -85,11 +96,15 @@ jobs:
   xmonad-config:
     name: Sample xmonad.hs
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
       - name: Install GHC and the Haskell libraries
         run: |
+          # Give up on a stalled download after 20 seconds without data and
+          # retry it, instead of hanging until the job times out
+          printf 'Acquire::http::Timeout "20";\nAcquire::https::Timeout "20";\nAcquire::Retries "3";\n' | sudo tee /etc/apt/apt.conf.d/99ci-network
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             ghc libghc-xmonad-contrib-dev libghc-dbus-dev

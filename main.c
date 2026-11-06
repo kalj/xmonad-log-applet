@@ -21,7 +21,7 @@
 #include "parser.h"
 
 // GSettings schema with the appearance settings and their defaults. It is
-// installed for all panels, but only MATE stores settings with it so far.
+// installed for all panels; MATE and Xfce store per-applet settings with it.
 #define XMONAD_LOG_APPLET_SCHEMA "org.mate.panel.applet.xmonad-log"
 
 #ifdef PANEL_GNOME
@@ -451,29 +451,29 @@ static void set_up_dbus_transfer(GtkWidget *container)
     g_signal_connect(container, "destroy", G_CALLBACK(unsubscribe), subscription);
 }
 
-#ifdef PANEL_MATE
-// Appearance settings
-static const char menu_xml[] =
-    "<menuitem name=\"Preferences\" action=\"Preferences\" />";
+#if defined(PANEL_MATE) || defined(PANEL_XFCE4)
+// Appearance settings and the preferences dialog, for the panels where each
+// applet has its own settings. The applet widget holds its GSettings object
+// as "settings", and the open dialog as "prefs-dialog".
 
-static void show_preferences(GtkAction *action, gpointer applet);
-
-static const GtkActionEntry menu_actions[] = {
-    { "Preferences", "document-properties", "_Preferences", NULL,
-      "Configure the appearance of the applet", G_CALLBACK(show_preferences) },
-};
-
-// Apply the "expand" setting as MATE_PANEL_APPLET_EXPAND_MAJOR
+// Apply the "expand" setting: let the applet fill the free space along the
+// panel, or not
 static void apply_expand_setting(GSettings *settings, const gchar *key, gpointer applet)
 {
+    gboolean expand = g_settings_get_boolean(settings, "expand");
+#ifdef PANEL_MATE
     MatePanelAppletFlags flags = mate_panel_applet_get_flags(MATE_PANEL_APPLET(applet));
 
-    if (g_settings_get_boolean(settings, "expand"))
+    if (expand)
         flags |= MATE_PANEL_APPLET_EXPAND_MAJOR;
     else
         flags &= ~MATE_PANEL_APPLET_EXPAND_MAJOR;
 
     mate_panel_applet_set_flags(MATE_PANEL_APPLET(applet), flags);
+#endif
+#ifdef PANEL_XFCE4
+    xfce_panel_plugin_set_expand(XFCE_PANEL_PLUGIN(applet), expand);
+#endif
 }
 
 // Redraw the workspaces with the last message when a setting that affects
@@ -613,11 +613,14 @@ static GtkWidget *spin_row(GSettings *settings, const char *label_text, const ch
 static void preferences_destroyed(GObject *applet, GtkWidget *dialog)
 {
     g_object_set_data(applet, "prefs-dialog", NULL);
+#ifdef PANEL_XFCE4
+    xfce_panel_plugin_unblock_menu(XFCE_PANEL_PLUGIN(applet));
+#endif
 }
 
 // Open the preferences dialog, or raise it if it is already open. Changes
 // are written to GSettings, and so applied, as soon as they are made.
-static void show_preferences(GtkAction *action, gpointer applet)
+static void open_preferences(GtkWidget *applet)
 {
     GtkWidget *dialog = g_object_get_data(G_OBJECT(applet), "prefs-dialog");
     if (dialog != NULL) {
@@ -631,7 +634,7 @@ static void show_preferences(GtkAction *action, gpointer applet)
         "Xmonad Log Applet Preferences", NULL, 0,
         "_Close", GTK_RESPONSE_CLOSE,
         NULL);
-    gtk_window_set_screen(GTK_WINDOW(dialog), gtk_widget_get_screen(GTK_WIDGET(applet)));
+    gtk_window_set_screen(GTK_WINDOW(dialog), gtk_widget_get_screen(applet));
     gtk_window_set_resizable(GTK_WINDOW(dialog), FALSE);
     g_signal_connect(dialog, "response", G_CALLBACK(gtk_widget_destroy), NULL);
 
@@ -688,6 +691,11 @@ static void show_preferences(GtkAction *action, gpointer applet)
                        FALSE, FALSE, 0);
 
     // Forget the dialog when it closes, and close it if the applet is removed
+#ifdef PANEL_XFCE4
+    // Xfce: grey out Properties while the dialog is open, as Xfce's own
+    // plugins do
+    xfce_panel_plugin_block_menu(XFCE_PANEL_PLUGIN(applet));
+#endif
     g_object_set_data(G_OBJECT(applet), "prefs-dialog", dialog);
     g_signal_connect_object(dialog, "destroy", G_CALLBACK(preferences_destroyed),
                             applet, G_CONNECT_SWAPPED);
@@ -697,23 +705,85 @@ static void show_preferences(GtkAction *action, gpointer applet)
     gtk_widget_show_all(dialog);
 }
 
-static void set_up_settings_and_menu(MatePanelApplet *applet, GtkWidget *container)
+// Keep settings with the applet, read them in signal_handler (via the
+// container), redraw when they change and apply the "expand" setting
+static void set_up_settings(GtkWidget *applet, GtkWidget *container, GSettings *settings)
 {
-    // Per-applet-instance settings; owned by the applet from here on
-    GSettings *settings = mate_panel_applet_settings_new(applet, XMONAD_LOG_APPLET_SCHEMA);
+    // Owned by the applet from here on
     g_object_set_data_full(G_OBJECT(applet), "settings", settings, g_object_unref);
 
-    // The appearance settings are read in signal_handler, via the container
     g_object_set_data(G_OBJECT(container), "settings", settings);
     g_signal_connect_object(settings, "changed", G_CALLBACK(redraw_workspaces), container, 0);
 
     g_signal_connect(settings, "changed::expand", G_CALLBACK(apply_expand_setting), applet);
     apply_expand_setting(settings, "expand", applet);
+}
+#endif
+
+#ifdef PANEL_MATE
+// MATE: the settings are per applet instance, at a path the panel chooses,
+// and the dialog is opened from a Preferences item in the applet's menu
+static void show_preferences(GtkAction *action, gpointer applet)
+{
+    open_preferences(GTK_WIDGET(applet));
+}
+
+static const char menu_xml[] =
+    "<menuitem name=\"Preferences\" action=\"Preferences\" />";
+
+static const GtkActionEntry menu_actions[] = {
+    { "Preferences", "document-properties", "_Preferences", NULL,
+      "Configure the appearance of the applet", G_CALLBACK(show_preferences) },
+};
+
+static void set_up_settings_and_menu(MatePanelApplet *applet, GtkWidget *container)
+{
+    GSettings *settings = mate_panel_applet_settings_new(applet, XMONAD_LOG_APPLET_SCHEMA);
+    set_up_settings(GTK_WIDGET(applet), container, settings);
 
     GtkActionGroup *actions = gtk_action_group_new("XmonadLogAppletActions");
     gtk_action_group_add_actions(actions, menu_actions, G_N_ELEMENTS(menu_actions), applet);
     mate_panel_applet_setup_menu(applet, menu_xml, actions);
     g_object_unref(actions);
+}
+#endif
+
+#ifdef PANEL_XFCE4
+// Xfce: the settings are per plugin instance, at a path made from the
+// plugin's id, and the dialog is opened from the plugin menu's Properties
+static void configure_plugin(XfcePanelPlugin *plugin, gpointer data)
+{
+    open_preferences(GTK_WIDGET(plugin));
+}
+
+// The plugin was removed from the panel for good: forget its settings
+static void forget_settings(XfcePanelPlugin *plugin, gpointer data)
+{
+    GSettings *settings = g_object_get_data(G_OBJECT(plugin), "settings");
+    gchar **keys = g_settings_schema_list_keys(appearance_schema());
+    for (gchar **key = keys; *key != NULL; key++)
+        g_settings_reset(settings, *key);
+    g_strfreev(keys);
+}
+
+static void set_up_settings_and_menu(XfcePanelPlugin *plugin, GtkWidget *container)
+{
+    GSettingsSchema *schema = appearance_schema();
+    if (schema == NULL) {
+        // No settings to store or show: use the defaults
+        xfce_panel_plugin_set_expand(plugin, TRUE);
+        return;
+    }
+
+    gchar *path = g_strdup_printf("/org/xmonad-log-applet/xfce4-panel/plugin-%d/",
+                                  xfce_panel_plugin_get_unique_id(plugin));
+    GSettings *settings = g_settings_new_full(schema, NULL, path);
+    g_free(path);
+    set_up_settings(GTK_WIDGET(plugin), container, settings);
+
+    xfce_panel_plugin_menu_show_configure(plugin);
+    g_signal_connect(plugin, "configure-plugin", G_CALLBACK(configure_plugin), NULL);
+    g_signal_connect(plugin, "removed", G_CALLBACK(forget_settings), NULL);
 }
 #endif
 
@@ -724,7 +794,7 @@ static gboolean xmonad_log_applet_fill(GpApplet *applet)
 static gboolean xmonad_log_applet_fill(MatePanelApplet *applet)
 #endif
 #ifdef PANEL_XFCE4
-static void xmonad_log_applet_fill(GtkContainer *container)
+static void xmonad_log_applet_fill(XfcePanelPlugin *plugin)
 #endif
 {
 #ifdef PANEL_GNOME
@@ -748,6 +818,9 @@ static void xmonad_log_applet_fill(GtkContainer *container)
 #ifdef PANEL_MATE
     set_up_settings_and_menu(applet, box);
 #endif
+#ifdef PANEL_XFCE4
+    set_up_settings_and_menu(plugin, box);
+#endif
     // Without X the applet still works, just with generic icons that can't
     // be clicked; xcb_init has already explained why
     xcb_init();
@@ -759,7 +832,7 @@ static void xmonad_log_applet_fill(GtkContainer *container)
 
     return TRUE;
 #else
-    gtk_container_add(container, box);
+    gtk_container_add(GTK_CONTAINER(plugin), box);
 #endif
 }
 
@@ -783,8 +856,7 @@ static gboolean xmonad_log_applet_factory(
 #ifdef PANEL_XFCE4
 static void xmonad_log_applet_construct(XfcePanelPlugin *plugin)
 {
-    xmonad_log_applet_fill(GTK_CONTAINER(plugin));
-    xfce_panel_plugin_set_expand(plugin, TRUE);
+    xmonad_log_applet_fill(plugin);
     gtk_widget_show_all(GTK_WIDGET(plugin));
 }
 #endif
