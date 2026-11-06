@@ -39,9 +39,10 @@ runs:
       run: ${{ github.action_path }}/install.sh
 
     - name: Save downloaded packages
-      # Only when there are packages and they changed, as a cache can't be
-      # overwritten
+      # Also after a failure, so a re-run can carry on; but only when there
+      # are packages and they changed, as a cache can't be overwritten
       if: >-
+        always() &&
         steps.install.outputs.count != '0' &&
         steps.install.outputs.key != steps.restore.outputs.cache-matched-key
       uses: actions/cache/save@v4
