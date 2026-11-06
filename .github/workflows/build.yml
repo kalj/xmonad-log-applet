@@ -33,6 +33,9 @@ jobs:
         # For MATE, the Build-Depends in debian/control minus the packaging
         # tools; the other panels use their own development package
         run: |
+          # Give up on a stalled download after 20 seconds without data and
+          # retry it, instead of hanging until the job times out
+          printf 'Acquire::http::Timeout "20";\nAcquire::https::Timeout "20";\nAcquire::Retries "3";\n' | sudo tee /etc/apt/apt.conf.d/99ci-network
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             autoconf automake libtool pkg-config \
@@ -67,6 +70,9 @@ jobs:
       - name: Install build dependencies
         # The packaging tools, then the Build-Depends from debian/control
         run: |
+          # Give up on a stalled download after 20 seconds without data and
+          # retry it, instead of hanging until the job times out
+          printf 'Acquire::http::Timeout "20";\nAcquire::https::Timeout "20";\nAcquire::Retries "3";\n' | sudo tee /etc/apt/apt.conf.d/99ci-network
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends dpkg-dev debhelper
           sudo apt-get build-dep -y ./
@@ -93,6 +99,9 @@ jobs:
 
       - name: Install GHC and the Haskell libraries
         run: |
+          # Give up on a stalled download after 20 seconds without data and
+          # retry it, instead of hanging until the job times out
+          printf 'Acquire::http::Timeout "20";\nAcquire::https::Timeout "20";\nAcquire::Retries "3";\n' | sudo tee /etc/apt/apt.conf.d/99ci-network
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             ghc libghc-xmonad-contrib-dev libghc-dbus-dev
