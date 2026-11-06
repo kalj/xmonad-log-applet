@@ -76,7 +76,10 @@ If you are compiling from a git clone, you should run `./autogen.sh` instead of
 
 `make check` runs the unit tests for the parsing of xmonad's messages.
 
-To build Debian packages instead, run `dpkg-buildpackage -us -uc -b` (with
+Ready-built Debian packages for Debian 13 and Ubuntu 24.04 are attached to
+each [release](https://github.com/kalj/xmonad-log-applet/releases).
+
+To build Debian packages yourself, run `dpkg-buildpackage -us -uc -b` (with
 the build dependencies from `debian/control` installed). It builds the applet
 for all three panels and writes `xmonad-log-applet-mate`, `-xfce` and
 `-gnome` packages, plus `xmonad-log-applet-common` with the files they share,

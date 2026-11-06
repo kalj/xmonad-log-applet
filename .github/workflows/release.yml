@@ -1,0 +1,112 @@
+name: Release packages
+
+# Build the Debian packages of a release and attach them to its GitHub
+# release: when a release is published, or by hand for an existing release
+# (Actions > Release packages > Run workflow). Pull requests that change
+# this workflow build the packages without attaching them anywhere.
+on:
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag of the release to attach the packages to
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  debs:
+    name: Debian packages (${{ matrix.name }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    # Build in the distribution itself, so that the packages depend on its
+    # library versions
+    container: ${{ matrix.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Debian 13
+            image: debian:trixie
+            suffix: debian13
+          - name: Ubuntu 24.04
+            image: ubuntu:24.04
+            suffix: ubuntu24.04
+    env:
+      # Empty for a pull request, which builds its own code
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      DEBIAN_FRONTEND: noninteractive
+      # Leave out the -dbgsym packages with debugging symbols
+      DEB_BUILD_OPTIONS: noautodbgsym
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Install build dependencies
+        # The packaging tools, then the Build-Depends from debian/control
+        run: |
+          # Give up on a stalled download after 20 seconds without data and
+          # retry it, instead of hanging until the job times out
+          printf 'Acquire::http::Timeout "20";\nAcquire::https::Timeout "20";\nAcquire::Retries "3";\n' > /etc/apt/apt.conf.d/99ci-network
+          apt-get update
+          apt-get install -y --no-install-recommends dpkg-dev debhelper
+          apt-get build-dep -y ./
+          # Needed to build the Xfce plugin on Debian 13 (see debian/control);
+          # installed here too for releases up to 3.0.0, which don't list it
+          apt-get install -y --no-install-recommends libxfce4ui-2-dev
+
+      - name: Check the version
+        # The Debian changelog must be for the release being built
+        if: env.TAG != ''
+        run: |
+          version=$(dpkg-parsechangelog -S Version)
+          echo "Tag $TAG, package version $version"
+          test "${version%-*}" = "$TAG"
+
+      - name: Build packages
+        run: dpkg-buildpackage -us -uc -b
+
+      - name: Collect packages
+        # dpkg-buildpackage writes to the parent directory. Name the files
+        # after the distribution, as the packages for Debian and Ubuntu
+        # would otherwise have the same names.
+        run: |
+          mkdir debs
+          for deb in ../*.deb; do
+            name=$(basename "$deb" .deb)
+            mv "$deb" "debs/${name%_*}_${{ matrix.suffix }}_${name##*_}.deb"
+          done
+          ls -l debs
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: debs-${{ matrix.suffix }}
+          path: debs/*.deb
+
+  upload:
+    name: Attach to the release
+    needs: debs
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: debs-*
+          path: debs
+          merge-multiple: true
+
+      - name: Upload the packages
+        # --clobber replaces packages from an earlier run
+        run: gh release upload "$TAG" debs/*.deb --clobber --repo "$GITHUB_REPOSITORY"
