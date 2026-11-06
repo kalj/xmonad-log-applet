@@ -13,6 +13,9 @@ Build-Depends:
  libxcb-ewmh-dev,
  libmate-panel-applet-dev,
  libxfce4panel-2.0-dev,
+# Required by libxfce4panel-2.0.pc since Xfce 4.20, but missing from
+# libxfce4panel-2.0-dev's dependencies in Debian 13
+ libxfce4ui-2-dev,
  libgnome-panel-dev
 Standards-Version: 4.7.0
 Homepage: https://github.com/kalj/xmonad-log-applet
