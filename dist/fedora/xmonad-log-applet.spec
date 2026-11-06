@@ -1,47 +1,58 @@
-Name:		xmonad-log-applet
-Version:	1.0.0
-Release:	1%{?dist}
-Summary:	A little applet that grabs logging output from Xmonad
+Name:           xmonad-log-applet
+Version:        2.90.0
+Release:        1%{?dist}
+Summary:        MATE panel applet showing xmonad's workspaces, window icons and title
 
-Group:		User Interface/X
-License:	BSD3
-URL:		http://uhsure.com/xmonad-log-applet.html
-Source0:	xmonad-log-applet.tar.gz
-BuildRoot:	%(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
+License:        BSD-3-Clause
+URL:            https://github.com/kalj/xmonad-log-applet
+Source0:        %{url}/archive/%{version}/%{name}-%{version}.tar.gz
 
-BuildRequires:	coreutils,gcc,sed,pkgconfig,glib2-devel,gnome-panel-devel
-Requires:	glib2,gnome-panel
+BuildRequires:  gcc
+BuildRequires:  make
+BuildRequires:  autoconf
+BuildRequires:  automake
+BuildRequires:  libtool
+BuildRequires:  pkgconfig(glib-2.0)
+BuildRequires:  pkgconfig(gio-2.0)
+BuildRequires:  pkgconfig(xcb)
+BuildRequires:  pkgconfig(xcb-ewmh)
+BuildRequires:  pkgconfig(libmatepanelapplet-4.0)
+
+Requires:       mate-panel
 
 %description
-
+An applet for the MATE panel that shows xmonad's workspaces, the icons of
+the windows on each workspace and the title of the focused window. Clicking
+a window's icon activates that window. xmonad sends the information over
+D-Bus; an example xmonad configuration is included in the documentation.
 
 %prep
-%setup -q
-
+%autosetup
 
 %build
-%configure
-make %{?_smp_mflags}
-
+autoreconf -fi
+%configure --with-panel=mate
+%make_build
 
 %install
-rm -rf $RPM_BUILD_ROOT
-make install DESTDIR=$RPM_BUILD_ROOT
+%make_install
 
-
-%clean
-rm -rf $RPM_BUILD_ROOT
-
+%check
+make check
 
 %files
-%defattr(-,root,root,-)
-%{_libdir}/gnome-applets/xmonad-log-applet
-%{_libdir}/bonobo/servers/xmonad-log-applet.server
-%{_datadir}/icons/hicolor/48x48/apps
-%doc
-
-
+%license LICENSE
+%doc README.md AUTHORS.md xmonad.hs
+%{_libexecdir}/%{name}
+%{_datadir}/mate-panel/applets/org.mate.panel.XmonadLogApplet.mate-panel-applet
+%{_datadir}/dbus-1/services/org.mate.panel.applet.XmonadLogAppletFactory.service
+%{_datadir}/glib-2.0/schemas/org.mate.panel.applet.xmonad-log.gschema.xml
+%{_datadir}/icons/hicolor/48x48/apps/%{name}.png
 
 %changelog
-* Mon Aug 15 2010 Adam Wick <awick@uhsure.com> - 1.0.0-1
+* Fri Nov 06 2026 Karl Ljungkvist <dev@kalj.se> - 2.90.0-1
+- Update to 2.90.0 and package the MATE applet instead of the GNOME 2 one
+- Modernise the spec file
+
+* Sun Aug 15 2010 Adam Wick <awick@uhsure.com> - 1.0.0-1
 - Initial spec file

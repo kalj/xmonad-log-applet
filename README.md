@@ -28,7 +28,8 @@ This fork includes all of that and adds:
   stored per applet with GSettings.
 * **GNOME panel fixes:** in-process applet support for libpanel-applet >= 3.22,
   from [u-quark](https://github.com/u-quark/xmonad-log-applet).
-* **Debian packaging** for the MATE applet (see `debian/`).
+* **Debian and Fedora packaging** for the MATE applet (see `debian/` and
+  `dist/fedora/`).
 
 **This fork is not a drop-in replacement.** The applet expects its own message
 format rather than Pango markup, so a config written for the other versions
