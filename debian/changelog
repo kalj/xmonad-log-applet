@@ -1,3 +1,14 @@
+xmonad-log-applet (3.0.0-1) unstable; urgency=medium
+
+  * New upstream version 3.0.0.
+  * The settings schema is renamed to org.xmonad.log-applet. Saved
+    settings are kept.
+  * Install NEWS.md with the other documentation in
+    xmonad-log-applet-common.
+  * Add debian/copyright.
+
+ -- Karl Ljungkvist <dev@kalj.se>  Fri, 06 Nov 2026 10:38:08 +0000
+
 xmonad-log-applet (2.90.0-2) unstable; urgency=medium
 
   * Build the applet for all three supported panels, as separate packages:

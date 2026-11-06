@@ -38,7 +38,7 @@ shows little more than the window title. Use the [`xmonad.hs`](xmonad.hs) in
 this repository as your starting point. Workspace names must be non-zero
 numbers; other workspaces are left out, with a warning in the panel's log.
 
-**Version 2.90 is a preview of 3.0.**
+See [NEWS.md](NEWS.md) for the changes in each release.
 
 Please report problems on [this fork's issue tracker](https://github.com/kalj/xmonad-log-applet/issues).
 

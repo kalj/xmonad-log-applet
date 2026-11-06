@@ -86,6 +86,7 @@ DISTCLEANFILES = \
 EXTRA_DIST = \
 	AUTHORS.md \
 	LICENSE \
+	NEWS.md \
 	README.md \
 	xmonad.hs \
 	xmonad-log-applet48.png \
