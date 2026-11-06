@@ -26,8 +26,9 @@ This fork includes all of that and adds:
   colours, bold text and a maximum title width. Open it with Preferences
   (MATE) or Properties (Xfce) in the applet's right-click menu. Settings are
   stored per applet with GSettings.
-* **GNOME panel fixes:** in-process applet support for libpanel-applet >= 3.22,
-  from [u-quark](https://github.com/u-quark/xmonad-log-applet).
+* **Current panels:** a module for gnome-panel 3.38 or later (GNOME
+  Flashback), and a plugin for Xfce panel 4.14 or later. Panel layouts from
+  the older GNOME applet still find the applet.
 * **Debian and Fedora packaging** for the MATE applet (see `debian/` and
   `dist/fedora/`).
 
@@ -37,8 +38,7 @@ shows little more than the window title. Use the [`xmonad.hs`](xmonad.hs) in
 this repository as your starting point. Workspace names must be non-zero
 numbers; other workspaces are left out, with a warning in the panel's log.
 
-**Version 2.90 is a preview of 3.0.** The MATE panel and Xfce panel 4.14 or
-later are supported; the GNOME builds are currently broken.
+**Version 2.90 is a preview of 3.0.**
 
 Please report problems on [this fork's issue tracker](https://github.com/kalj/xmonad-log-applet/issues).
 
@@ -66,10 +66,10 @@ already running Xmonad within [GNOME][1], MATE or [Xfce][2]:
 * The panel applet. Pull the latest version from the git repository: `git clone
   https://github.com/kalj/xmonad-log-applet.git`
 
-The applet supports GNOME 2, GNOME Flashback, MATE and Xfce 4 panels, just pass
-`--with-panel=X` to `./configure` when compiling, where X is one of gnome2,
-gnome3, gnomeflashback, mate or xfce4. Use gnome3 when compiling for older
-versions of Gnome 3 with libpanelapplet-4.0.
+The applet supports the MATE panel, gnome-panel 3.38 or later (as used by GNOME
+Flashback) and Xfce panel 4.14 or later. Pass `--with-panel=X` to `./configure`
+when compiling, where X is one of mate, gnome or xfce4 (the default). The GNOME
+2 and older GNOME 3 panels are no longer supported.
 
 If you are compiling from a git clone, you should run `./autogen.sh` instead of
 `./configure`.
@@ -82,9 +82,10 @@ If you are compiling from a git clone, you should run `./autogen.sh` instead of
 
     The recommended package is [dbus][5].
 
-*   How to add applets to the GNOME3 panel?
+*   How to add applets to the GNOME panel?
 
-    You need to hold the Alt key when right-clicking the panel.
+    Hold the Alt key when right-clicking the panel. Alt and right-click on the
+    applet gives the menu for moving or removing it.
 
 ## Contact
 

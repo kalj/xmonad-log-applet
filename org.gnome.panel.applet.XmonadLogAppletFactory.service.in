@@ -1,3 +1,0 @@
-[D-BUS Service]
-Name=org.gnome.panel.applet.XmonadLogAppletFactory
-Exec=@PLUGIN_DIR@/xmonad-log-applet

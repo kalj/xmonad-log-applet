@@ -1,22 +1,14 @@
 plugindir = $(PLUGIN_DIR)
 
-# The applet is a module loaded by the panel for GNOME's in-process applets
-# and Xfce, otherwise a program the panel starts
-if PANEL_GNOME_IN_PROC
-xmonad_log_appletdir = $(libdir)/gnome-panel/modules
-PLUGIN_DIR_ = $(libdir)/gnome-panel/modules
-xmonad_log_applet_LTLIBRARIES = libxmonad-log-applet.la
-PLUGIN_FILE = libxmonad-log-applet.la
-IN_PROC_STR = "InProcess=true"
-else
-if PANEL_XFCE4
-xmonad_log_appletdir = $(PLUGIN_DIR)
-xmonad_log_applet_LTLIBRARIES = libxmonad-log-applet.la
-else
+# The applet is a module loaded by the panel for GNOME and Xfce, and a
+# program the panel starts for MATE
+if PANEL_MATE
 plugin_PROGRAMS = xmonad-log-applet
 PLUGIN_DIR_ = $(PLUGIN_DIR)
 PLUGIN_FILE = xmonad-log-applet
-endif
+else
+xmonad_log_appletdir = $(PLUGIN_DIR)
+xmonad_log_applet_LTLIBRARIES = libxmonad-log-applet.la
 endif
 
 libxmonad_log_applet_la_SOURCES = main.c parser.c parser.h
@@ -59,13 +51,6 @@ tests_test_parser_LDADD = $(GLIB_LIBS)
 TESTS = $(check_PROGRAMS)
 
 appletdir = $(LIBPANEL_APPLET_DIR)
-if PANEL_GNOME
-applet_files = org.gnome.panel.XmonadLogApplet.panel-applet
-$(applet_files): $(applet_files:.panel-applet=.panel-applet.in)
-	$(SED) -e "s|\@PLUGIN_DIR\@|$(PLUGIN_DIR_)|" \
-		   -e "s|\@PLUGIN_FILE\@|$(PLUGIN_FILE)|" \
-		   -e "s|\@IN_PROC\@|$(IN_PROC_STR)|" $< > $@
-endif
 if PANEL_MATE
 applet_files = org.mate.panel.XmonadLogApplet.mate-panel-applet
 $(applet_files): $(applet_files:.mate-panel-applet=.mate-panel-applet.in)
@@ -81,13 +66,6 @@ endif
 
 applet_DATA = $(applet_files)
 
-if PANEL_GNOME
-servicedir = $(SESSION_BUS_SERVICES_DIR)
-service_in_files = org.gnome.panel.applet.XmonadLogAppletFactory.service.in
-service_DATA = $(service_in_files:.service.in=.service)
-org.gnome.panel.applet.XmonadLogAppletFactory.service: $(service_in_files)
-	 $(SED) -e "s|\@PLUGIN_DIR\@|$(PLUGIN_DIR)|" $< > $@
-endif
 if PANEL_MATE
 servicedir = $(SESSION_BUS_SERVICES_DIR)
 service_in_files = org.mate.panel.applet.XmonadLogAppletFactory.service.in
@@ -111,8 +89,6 @@ EXTRA_DIST = \
 	README.md \
 	xmonad.hs \
 	xmonad-log-applet48.png \
-	org.gnome.panel.XmonadLogApplet.panel-applet.in \
-	org.gnome.panel.applet.XmonadLogAppletFactory.service.in \
 	org.mate.panel.XmonadLogApplet.mate-panel-applet.in \
 	org.mate.panel.applet.XmonadLogAppletFactory.service.in \
 	org.mate.panel.applet.xmonad-log.gschema.xml \
