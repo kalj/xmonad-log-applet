@@ -22,10 +22,10 @@ This fork includes all of that and adds:
 * **Window icons and colours**, from [hamax's fork](https://github.com/hamax/xmonad-log-applet):
   icons, click-to-activate, and separate colours for current, visible, hidden
   and urgent workspaces.
-* **Preferences dialog (MATE and Xfce):** set expand to fill panel, workspace
-  colours, bold text and a maximum title width. Open it with Preferences
-  (MATE) or Properties (Xfce) in the applet's right-click menu. Settings are
-  stored per applet with GSettings.
+* **Preferences dialog:** set expand to fill panel (MATE and Xfce),
+  workspace colours, bold text and a maximum title width. Open it with
+  Preferences (MATE, GNOME) or Properties (Xfce) in the applet's right-click
+  menu. Settings are stored per applet with GSettings.
 * **Current panels:** a module for gnome-panel 3.38 or later (GNOME
   Flashback), and a plugin for Xfce panel 4.14 or later. Panel layouts from
   the older GNOME applet still find the applet.
@@ -85,7 +85,8 @@ If you are compiling from a git clone, you should run `./autogen.sh` instead of
 *   How to add applets to the GNOME panel?
 
     Hold the Alt key when right-clicking the panel. Alt and right-click on the
-    applet gives the menu for moving or removing it.
+    applet gives the menu for moving or removing it; a plain right-click gives
+    the applet's own menu, with Preferences.
 
 ## Contact
 

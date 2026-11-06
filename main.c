@@ -21,7 +21,7 @@
 #include "parser.h"
 
 // GSettings schema with the appearance settings and their defaults. It is
-// installed for all panels; MATE and Xfce store per-applet settings with it.
+// installed and used for all panels, which store per-applet settings with it.
 #define XMONAD_LOG_APPLET_SCHEMA "org.mate.panel.applet.xmonad-log"
 
 #ifdef PANEL_GNOME
@@ -451,13 +451,15 @@ static void set_up_dbus_transfer(GtkWidget *container)
     g_signal_connect(container, "destroy", G_CALLBACK(unsubscribe), subscription);
 }
 
-#if defined(PANEL_MATE) || defined(PANEL_XFCE4)
-// Appearance settings and the preferences dialog, for the panels where each
-// applet has its own settings. The applet widget holds its GSettings object
-// as "settings", and the open dialog as "prefs-dialog".
+// Appearance settings and the preferences dialog. Each applet has its own
+// settings: the applet widget holds its GSettings object as "settings", and
+// the open dialog as "prefs-dialog".
 
 // Apply the "expand" setting: let the applet fill the free space along the
-// panel, or not
+// panel, or not. Not used on GNOME: gnome-panel grows an applet with
+// GP_APPLET_FLAGS_EXPAND_MAJOR only up to its natural size, so the setting
+// would have no visible effect there.
+#ifndef PANEL_GNOME
 static void apply_expand_setting(GSettings *settings, const gchar *key, gpointer applet)
 {
     gboolean expand = g_settings_get_boolean(settings, "expand");
@@ -475,6 +477,7 @@ static void apply_expand_setting(GSettings *settings, const gchar *key, gpointer
     xfce_panel_plugin_set_expand(XFCE_PANEL_PLUGIN(applet), expand);
 #endif
 }
+#endif
 
 // Redraw the workspaces with the last message when a setting that affects
 // them changes (all settings but "expand" do)
@@ -642,11 +645,13 @@ static void open_preferences(GtkWidget *applet)
     gtk_container_set_border_width(GTK_CONTAINER(vbox), 12);
     gtk_container_add(GTK_CONTAINER(gtk_dialog_get_content_area(GTK_DIALOG(dialog))), vbox);
 
+#ifndef PANEL_GNOME
     gtk_box_pack_start(GTK_BOX(vbox),
                        check_row(settings, "_Expand to fill panel",
                                  "Let the applet take up all free space along the panel",
                                  "expand"),
                        FALSE, FALSE, 0);
+#endif
 
     // Workspace colours: one row per state, and a reset button
     GtkWidget *rows = dialog_section(vbox, "Workspace Colours");
@@ -706,7 +711,8 @@ static void open_preferences(GtkWidget *applet)
 }
 
 // Keep settings with the applet, read them in signal_handler (via the
-// container), redraw when they change and apply the "expand" setting
+// container), redraw when they change and apply the "expand" setting (not
+// on GNOME)
 static void set_up_settings(GtkWidget *applet, GtkWidget *container, GSettings *settings)
 {
     // Owned by the applet from here on
@@ -715,10 +721,11 @@ static void set_up_settings(GtkWidget *applet, GtkWidget *container, GSettings *
     g_object_set_data(G_OBJECT(container), "settings", settings);
     g_signal_connect_object(settings, "changed", G_CALLBACK(redraw_workspaces), container, 0);
 
+#ifndef PANEL_GNOME
     g_signal_connect(settings, "changed::expand", G_CALLBACK(apply_expand_setting), applet);
     apply_expand_setting(settings, "expand", applet);
-}
 #endif
+}
 
 #ifdef PANEL_MATE
 // MATE: the settings are per applet instance, at a path the panel chooses,
@@ -788,6 +795,56 @@ static void set_up_settings_and_menu(XfcePanelPlugin *plugin, GtkWidget *contain
 #endif
 
 #ifdef PANEL_GNOME
+// GNOME: the settings are per applet instance, at a path the panel chooses
+// (and resets when the applet is removed), and the dialog is opened from a
+// Preferences item in the applet's menu
+#define APPLET_ID "xmonad-log-applet"
+
+static void preferences_activated(GSimpleAction *action, GVariant *parameter, gpointer applet)
+{
+    open_preferences(GTK_WIDGET(applet));
+}
+
+static const GActionEntry menu_actions[] = {
+    { .name = "preferences", .activate = preferences_activated },
+    { NULL }
+};
+
+// gnome-panel looks for the menu "<applet id>-menu", whose actions are
+// "<applet id>.<action>"
+static const char menu_xml[] =
+    "<interface>"
+    "  <menu id=\"" APPLET_ID "-menu\">"
+    "    <section>"
+    "      <item>"
+    "        <attribute name=\"label\">_Preferences</attribute>"
+    "        <attribute name=\"action\">" APPLET_ID ".preferences</attribute>"
+    "      </item>"
+    "    </section>"
+    "  </menu>"
+    "</interface>";
+
+static void set_up_settings_and_menu(GpApplet *applet, GtkWidget *container)
+{
+    // Without the schema there are no settings to store or show: keep the
+    // defaults (gp_applet_settings_new would abort)
+    if (appearance_schema() == NULL)
+        return;
+
+    GSettings *settings = gp_applet_settings_new(applet, XMONAD_LOG_APPLET_SCHEMA);
+    set_up_settings(GTK_WIDGET(applet), container, settings);
+
+    gp_applet_setup_menu(applet, menu_xml, menu_actions);
+
+    // Like gnome-panel's own applets, offer no preferences while the panel
+    // is locked down
+    GAction *action = gp_applet_menu_lookup_action(applet, "preferences");
+    g_object_bind_property(applet, "locked-down", action, "enabled",
+                           G_BINDING_DEFAULT | G_BINDING_INVERT_BOOLEAN | G_BINDING_SYNC_CREATE);
+}
+#endif
+
+#ifdef PANEL_GNOME
 static gboolean xmonad_log_applet_fill(GpApplet *applet)
 #endif
 #ifdef PANEL_MATE
@@ -820,6 +877,9 @@ static void xmonad_log_applet_fill(XfcePanelPlugin *plugin)
 #endif
 #ifdef PANEL_XFCE4
     set_up_settings_and_menu(plugin, box);
+#endif
+#ifdef PANEL_GNOME
+    set_up_settings_and_menu(applet, box);
 #endif
     // Without X the applet still works, just with generic icons that can't
     // be clicked; xcb_init has already explained why
@@ -887,8 +947,6 @@ static void xmonad_log_applet_class_init(XmonadLogAppletClass *klass)
 static void xmonad_log_applet_init(XmonadLogApplet *self)
 {
 }
-
-#define APPLET_ID "xmonad-log-applet"
 
 static GpAppletInfo *get_applet_info(const gchar *id)
 {
