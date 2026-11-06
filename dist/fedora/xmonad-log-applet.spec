@@ -46,7 +46,7 @@ make check
 %{_libexecdir}/%{name}
 %{_datadir}/mate-panel/applets/org.mate.panel.XmonadLogApplet.mate-panel-applet
 %{_datadir}/dbus-1/services/org.mate.panel.applet.XmonadLogAppletFactory.service
-%{_datadir}/glib-2.0/schemas/org.mate.panel.applet.xmonad-log.gschema.xml
+%{_datadir}/glib-2.0/schemas/org.xmonad.log-applet.gschema.xml
 %{_datadir}/icons/hicolor/48x48/apps/%{name}.png
 
 %changelog

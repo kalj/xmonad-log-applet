@@ -22,7 +22,7 @@
 
 // GSettings schema with the appearance settings and their defaults. It is
 // installed and used for all panels, which store per-applet settings with it.
-#define XMONAD_LOG_APPLET_SCHEMA "org.mate.panel.applet.xmonad-log"
+#define XMONAD_LOG_APPLET_SCHEMA "org.xmonad.log-applet"
 
 #ifdef PANEL_GNOME
 #include <libgnome-panel/gp-applet.h>
@@ -782,7 +782,7 @@ static void set_up_settings_and_menu(XfcePanelPlugin *plugin, GtkWidget *contain
         return;
     }
 
-    gchar *path = g_strdup_printf("/org/xmonad-log-applet/xfce4-panel/plugin-%d/",
+    gchar *path = g_strdup_printf("/org/xmonad/log-applet/xfce4-panel/plugin-%d/",
                                   xfce_panel_plugin_get_unique_id(plugin));
     GSettings *settings = g_settings_new_full(schema, NULL, path);
     g_free(path);
