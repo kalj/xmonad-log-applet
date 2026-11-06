@@ -29,8 +29,8 @@ This fork includes all of that and adds:
 * **Current panels:** a module for gnome-panel 3.38 or later (GNOME
   Flashback), and a plugin for Xfce panel 4.14 or later. Panel layouts from
   the older GNOME applet still find the applet.
-* **Debian and Fedora packaging** for the MATE applet (see `debian/` and
-  `dist/fedora/`).
+* **Debian packages** for all three panels (see `debian/`), and a Fedora
+  package of the MATE applet (see `dist/fedora/`).
 
 **This fork is not a drop-in replacement.** The applet expects its own message
 format rather than Pango markup, so a config written for the other versions
@@ -75,6 +75,16 @@ If you are compiling from a git clone, you should run `./autogen.sh` instead of
 `./configure`.
 
 `make check` runs the unit tests for the parsing of xmonad's messages.
+
+To build Debian packages instead, run `dpkg-buildpackage -us -uc -b` (with
+the build dependencies from `debian/control` installed). It builds the applet
+for all three panels and writes `xmonad-log-applet-mate`, `-xfce` and
+`-gnome` packages, plus `xmonad-log-applet-common` with the files they share,
+to the parent directory. Install the one for your panel together with
+`-common`, for example
+`sudo apt install ./xmonad-log-applet-common_*.deb ./xmonad-log-applet-mate_*.deb`.
+Use `apt` rather than `dpkg -i`: when upgrading from the older
+`xmonad-log-applet` package, `apt` removes it, but `dpkg -i` refuses.
 
 ## FAQ
 

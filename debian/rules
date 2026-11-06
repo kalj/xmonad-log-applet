@@ -1,7 +1,37 @@
 #!/usr/bin/make -f
 
+# The applet is built once for each panel, each in its own build directory,
+# and installed into debian/tmp. The .install files then split it into one
+# package per panel, plus -common for the files all three install.
+PANELS = mate xfce4 gnome
+
 %:
 	dh $@
 
 override_dh_auto_configure:
-	./autogen.sh --with-panel=mate --prefix=/usr
+	set -e; for panel in $(PANELS); do \
+	  dh_auto_configure --builddirectory=build-$$panel -- --with-panel=$$panel; \
+	done
+
+override_dh_auto_build:
+	set -e; for panel in $(PANELS); do \
+	  dh_auto_build --builddirectory=build-$$panel; \
+	done
+
+override_dh_auto_test:
+	set -e; for panel in $(PANELS); do \
+	  dh_auto_test --builddirectory=build-$$panel; \
+	done
+
+override_dh_auto_install:
+	set -e; for panel in $(PANELS); do \
+	  dh_auto_install --builddirectory=build-$$panel --destdir=debian/tmp; \
+	done
+	# The panels load the modules by their .so; Debian doesn't ship .la files
+	find debian/tmp -name '*.la' -delete
+
+# Also clean an in-tree build (from ./autogen.sh and make), which would stop
+# configure from running in the build directories
+override_dh_auto_clean:
+	dh_auto_clean
+	rm -rf $(addprefix build-,$(PANELS))
