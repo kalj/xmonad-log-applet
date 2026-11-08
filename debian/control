@@ -14,7 +14,9 @@ Build-Depends:
  libmate-panel-applet-dev,
  libxfce4panel-2.0-dev,
 # Required by libxfce4panel-2.0.pc since Xfce 4.20, but missing from
-# libxfce4panel-2.0-dev's dependencies in Debian 13
+# libxfce4panel-2.0-dev's dependencies in Debian 13 (Debian bug #1153459).
+# Can be removed once libxfce4panel-2.0-dev depends on it in every release
+# the packages are built for.
  libxfce4ui-2-dev,
  libgnome-panel-dev
 Standards-Version: 4.7.0
