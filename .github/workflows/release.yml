@@ -57,8 +57,9 @@ jobs:
           apt-get update
           apt-get install -y --no-install-recommends dpkg-dev debhelper
           apt-get build-dep -y ./
-          # Needed to build the Xfce plugin on Debian 13 (see debian/control);
-          # installed here too for releases up to 3.0.0, which don't list it
+          # Needed to build the Xfce plugin on Debian 13 (Debian bug #1153459,
+          # see debian/control); installed here too for releases up to 3.0.0,
+          # which don't list it
           apt-get install -y --no-install-recommends libxfce4ui-2-dev
 
       - name: Check the version
